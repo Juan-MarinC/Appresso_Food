@@ -66,5 +66,46 @@
     <div class="actions">
         <a class="button secondary" href="/laboratorio/operation_counts.csv?size={{ result.size }}">Descargar CSV</a>
     </div>
+
+    {% macro celda(m) %}<td>{{ "{:,}".format(m.ops).replace(",", ".") if m.ops is not none else "—" }}</td><td>{{ "%.2f"|format(m.ms) }} ms</td>{% endmacro %}
+    {% macro marca(f) %}{% if f.estimado %}<small title="Estimado a partir de n = {{ limite }}: con n × k, el trabajo O(n²) crece k²">≈ estimado</small>{% endif %}{% endmacro %}
+
+    <div class="panel lab-comparacion" style="margin-top: 20px;">
+        <h2>Comparación de algoritmos: O(n²) contra O(n) y O(n log n)</h2>
+        <p class="subtitle">Los mismos pedidos de prueba con fechas al azar y nombres de cliente escritos de varias formas.
+            Los O(n²) se miden hasta n = {{ limite }}; para n mayores se <strong>estiman</strong> (con 25.000 tardarían minutos, que es justo lo que muestra la tabla).</p>
+
+        <h3>Conteo de pedidos por cliente · optimización O(n²) → O(n)</h3>
+        <div class="tabla-scroll"><table>
+            <tr><th>n</th><th>Ingenuo: cada pedido contra todos<br><small>comparaciones · O(n²)</small></th><th>Tiempo</th><th>Con diccionario<br><small>consultas · O(n)</small></th><th>Tiempo</th><th>Mejora</th></tr>
+            {% for f in result.comparacion %}<tr><td>{{ f.n }}</td>{{ celda(f.conteo_ingenuo) }}{{ celda(f.conteo_rapido) }}<td><strong>× {{ "%.0f"|format(f.mejora_conteo) }}</strong> {{ marca(f) }}</td></tr>{% endfor %}
+        </table></div>
+
+        <h3>Ordenamiento · simple O(n²) contra por fecha O(n log n)</h3>
+        <div class="tabla-scroll"><table>
+            <tr><th>n</th><th>Inserción, por total<br><small>comparaciones · O(n²)</small></th><th>Tiempo</th><th>Merge sort, por fecha<br><small>comparaciones · O(n log n)</small></th><th>Tiempo</th><th>sorted() de Python<br><small>Timsort · O(n log n)</small></th><th>Mejora</th></tr>
+            {% for f in result.comparacion %}<tr><td>{{ f.n }}</td>{{ celda(f.insercion) }}{{ celda(f.merge) }}<td>{{ "%.2f"|format(f.timsort.ms) }} ms</td><td><strong>× {{ "%.0f"|format(f.mejora_orden) }}</strong> {{ marca(f) }}</td></tr>{% endfor %}
+        </table></div>
+
+        <h3>Normalizar y unificar clientes duplicados · O(n²) → O(n)</h3>
+        <div class="tabla-scroll"><table>
+            <tr><th>n</th><th>Formas de escribir → clientes reales</th><th>Ingenuo: todos contra todos<br><small>comparaciones · O(n²)</small></th><th>Tiempo</th><th>Por clave normalizada<br><small>consultas · O(n)</small></th><th>Tiempo</th><th>Mejora</th></tr>
+            {% for f in result.comparacion %}<tr><td>{{ f.n }}</td><td>{{ f.clientes_distintos }} → {{ f.clientes_reales }}</td>{{ celda(f.dup_ingenuo) }}{{ celda(f.dup_rapido) }}<td><strong>× {{ "%.0f"|format(f.mejora_dup) }}</strong> {{ marca(f) }}</td></tr>{% endfor %}
+        </table></div>
+
+        <h3>Ranking de ítems más vendidos y normalización de nombres · O(n)</h3>
+        <div class="tabla-scroll"><table>
+            <tr><th>n</th><th>Ranking: sumas</th><th>Tiempo</th><th>Top 3</th><th>Normalizar nombres</th><th>Tiempo</th></tr>
+            {% for f in result.comparacion %}<tr><td>{{ f.n }}</td>{{ celda(f.ranking) }}<td>{{ f.top|map("first")|join(", ") }}</td>{{ celda(f.normalizar) }}</tr>{% endfor %}
+        </table></div>
+
+        <ul class="subtitle">
+            <li><strong>O(n²):</strong> con n × 10, las comparaciones se multiplican por 100. Con 25.000 pedidos el conteo ingenuo haría 625 millones.</li>
+            <li><strong>O(n log n):</strong> con n × 10, el trabajo crece algo más de 10 veces. Merge sort siempre hace del orden de n·log₂ n comparaciones; <code>sorted()</code> de Python (Timsort) es la versión optimizada en C del mismo orden.</li>
+            <li><strong>Optimización documentada:</strong> cambiar la búsqueda repetida (O(n²)) por un diccionario (O(n)) da el mismo resultado, y la mejora crece con n. Es lo que hacen el reporte de calidad y la detección de duplicados de la app.</li>
+            <li>El tiempo depende del equipo; las operaciones contadas no.</li>
+        </ul>
+        <div class="actions"><a class="button secondary" href="/laboratorio/comparacion.csv?size={{ result.size }}">Descargar comparación (CSV)</a></div>
+    </div>
     {% endif %}
 {% endblock %}

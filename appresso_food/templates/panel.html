@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% set pagina = "panel" %}
+
+{% block titulo %}Panel - Appresso Food{% endblock %}
+
+{% block hero %}
+<section class="pagina-cabeza">
+  <div class="pagina-cabeza__fila">
+    <h1>Panel</h1>
+    <p>Ventas, alertas, patrones, calidad de datos, integridad y benchmark en un solo lugar.</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block contenido %}
+{% set p = patrones %}
+<div class="summary">
+  <div class="card"><div class="label">Ventas facturadas</div><div class="value">{{ p.ventas|pesos }}</div><small>{{ p.facturas }} facturas vigentes · {{ p.anuladas }} anuladas</small></div>
+  <div class="card"><div class="label">Ticket promedio</div><div class="value">{{ p.ticket_promedio|pesos }}</div><small>impuesto al consumo incluido</small></div>
+  <div class="card"><div class="label">Alertas antifraude hoy</div><div class="value" id="alertas-hoy">…</div><small><a href="/antifraude">ver en el panel antifraude</a></small></div>
+  <div class="card"><div class="label">Calidad de datos</div><div class="value">{{ calidad.puntaje }} %</div><small>registros sin problemas</small></div>
+  <div class="card"><div class="label">Modelo de fraude (IA)</div><div class="value" id="ia-panel">—</div><small id="ia-panel-detalle"><a href="/ia">entrenar en la página de IA</a></small></div>
+</div>
+
+<div class="content-grid">
+  <div class="panel">
+    <h2>Integridad (hash encadenado)</h2>
+    {% include "_integridad.html" %}
+    <p class="subtitle"><a href="/facturas">Ver facturas y pagos</a> · <a href="/api/integridad">API</a></p>
+  </div>
+
+  <div class="panel">
+    <h2>Calidad de datos</h2>
+    {% if not calidad.problemas %}<p class="subtitle">No se encontraron problemas.</p>{% endif %}
+    <ul class="growth-list">
+      {% for prob in calidad.problemas %}
+      <li><span><strong>{{ prob.modulo }}</strong> · {{ prob.detalle }}<br><small>{{ prob.ejemplos[:2]|map("string")|join(" · ") }}</small></span><strong>{{ prob.cantidad }}</strong></li>
+      {% endfor %}
+    </ul>
+    <p class="subtitle">Revisados: {% for k, v in calidad.revisados.items() %}{{ v }} {{ k }}{{ ", " if not loop.last }}{% endfor %}. <a href="/api/calidad">Reporte completo</a></p>
+  </div>
+</div>
+
+<div class="content-grid">
+  <div class="panel">
+    <h2>Empleados: descuentos y anulaciones</h2>
+    <div class="tabla-scroll"><table>
+      <tr><th>Quién factura</th><th>Facturas</th><th>Con descuento</th><th>Descuento prom.</th><th>Anulaciones</th><th>Alerta</th></tr>
+      {% for e in empleados %}
+      <tr><td>{{ e.empleado }}</td><td>{{ e.facturas }}</td><td>{{ e.con_descuento }}</td><td>{{ "%.1f"|format(e.descuento_promedio) }} %</td><td>{{ e.anulaciones }}</td>
+          <td>{% if e.alertas %}<span class="chip-alerta">{{ e.alertas|join("; ") }}</span>{% else %}—{% endif %}</td></tr>
+      {% else %}
+      <tr><td colspan="6" class="empty">Aún no hay facturas.</td></tr>
+      {% endfor %}
+    </table></div>
+    <p class="subtitle">Se marca a quien da descuentos por encima de Q3 + 1,5·RIC frente a los demás, o anula más de la mitad de sus facturas.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Patrones: montos, horarios y canal</h2>
+    {% if p.montos %}
+    <p>Montos de factura: Q1 <strong>{{ p.montos.q1|pesos }}</strong> · mediana <strong>{{ p.montos.mediana|pesos }}</strong> · Q3 <strong>{{ p.montos.q3|pesos }}</strong>.
+       Atípicos fuera de {{ [p.montos.limite_bajo, 0]|max|pesos }} – {{ p.montos.limite_alto|pesos }}: <strong>{{ p.montos_atipicos|length }}</strong>
+       {% if p.montos_atipicos %}({{ p.montos_atipicos[:3]|map(attribute="factura")|join(", ") }}){% endif %}.</p>
+    {% else %}
+    <p class="subtitle">Con 4 facturas o más se calculan los cuartiles de montos.</p>
+    {% endif %}
+    <p>Por canal: {% for canal, n in p.por_canal.items() %}<strong>{{ canal }}</strong> {{ n }}{{ " · " if not loop.last }}{% endfor %}</p>
+    <div class="horas" aria-label="Pedidos por hora">
+      {% set maximo = (p.por_hora|map("last")|max) if p.por_hora else 1 %}
+      {% for hora, n in p.por_hora %}<div class="horas__barra" style="--alto: {{ (100 * n / maximo)|round }}%" title="{{ hora }}:00 · {{ n }} pedidos"><span>{{ hora }}</span></div>{% endfor %}
+    </div>
+    <p class="subtitle">Clientes más frecuentes: {% for c, n in p.clientes_frecuentes %}{{ c }} ({{ n }}){{ ", " if not loop.last }}{% endfor %}</p>
+  </div>
+</div>
+
+<div class="content-grid">
+  <div class="panel">
+    <h2>Benchmark (n = {{ benchmark.n }})</h2>
+    <table>
+      <tr><th>Problema</th><th>Ingenuo O(n²)</th><th>Optimizado</th><th>Mejora</th></tr>
+      <tr><td>Conteo por cliente</td><td>{{ "%.1f"|format(benchmark.conteo_ingenuo.ms) }} ms</td><td>{{ "%.2f"|format(benchmark.conteo_rapido.ms) }} ms · O(n)</td><td><strong>× {{ "%.0f"|format(benchmark.mejora_conteo) }}</strong></td></tr>
+      <tr><td>Ordenamiento</td><td>{{ "%.1f"|format(benchmark.insercion.ms) }} ms</td><td>{{ "%.2f"|format(benchmark.merge.ms) }} ms · O(n log n)</td><td><strong>× {{ "%.0f"|format(benchmark.mejora_orden) }}</strong></td></tr>
+      <tr><td>Clientes duplicados</td><td>{{ "%.1f"|format(benchmark.dup_ingenuo.ms) }} ms</td><td>{{ "%.2f"|format(benchmark.dup_rapido.ms) }} ms · O(n)</td><td><strong>× {{ "%.0f"|format(benchmark.mejora_dup) }}</strong></td></tr>
+    </table>
+    <p class="subtitle"><a href="/laboratorio">Laboratorio completo, hasta n = 25.000</a></p>
+  </div>
+
+  <div class="panel">
+    <h2>Más vendidos</h2>
+    <ul class="growth-list">
+      {% for nombre, unidades in top_products %}<li><span>#{{ loop.index }} {{ nombre }}</span><strong>{{ unidades }} und.</strong></li>
+      {% else %}<li>Aún no hay pedidos.</li>{% endfor %}
+    </ul>
+    <p class="subtitle"><a href="/dashboard">Pronóstico de ventas y más en el dashboard</a></p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Las alertas viven en MongoDB (pasarela antifraude); si no está disponible, el panel sigue funcionando.
+  fetch("/api/stats").then((r) => r.ok ? r.json() : null).then((s) => {
+    const n = s && s.periodos && s.periodos.hoy ? s.periodos.hoy.total_anomalias : null;
+    document.getElementById("alertas-hoy").textContent = n ?? "—";
+  }).catch(() => { document.getElementById("alertas-hoy").textContent = "—"; });
+  // Métricas del último entrenamiento en /ia (se guardan en este navegador).
+  try {
+    const m = JSON.parse(localStorage.getItem("appresso-ia-metricas"));
+    if (m) {
+      document.getElementById("ia-panel").textContent = (100 * m.accuracy).toFixed(1) + " %";
+      document.getElementById("ia-panel-detalle").textContent = `precisión · detecta ${(100 * m.recall).toFixed(1)} % de los fraudes · F1 ${m.f1.toFixed(3)}`;
+    }
+  } catch (e) { /* sin almacenamiento */ }
+</script>
+{% endblock %}

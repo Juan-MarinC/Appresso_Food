@@ -5,7 +5,9 @@ services:
     build: .
     ports:
       # Solo desde este equipo: de afuera se entra por ngrok, que corre aquí mismo y apunta a localhost:8000.
-      - "127.0.0.1:8000:8000"
+      # Si Windows reservó el 8000 (pasa tras reiniciar: netsh ... show excludedportrange), use otro puerto:
+      #   PowerShell: $env:APPRESSO_PUERTO="8888"; docker compose up -d   y   ngrok http 127.0.0.1:8888
+      - "127.0.0.1:${APPRESSO_PUERTO:-8000}:8000"
     environment:
       APPRESSO_MONGO_URI: mongodb://mongo:27017
       # Dentro de Docker ninguna petición llega desde 127.0.0.1: sin esto, cocina (atender/despachar/deshacer)

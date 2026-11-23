@@ -53,9 +53,14 @@ def token_para(request: Request) -> Optional[str]:
     return TOKEN if permitido and _mismo_sitio(request) else None
 
 
+def token_valido(request: Request, recibido: str) -> bool:
+    """¿El token recibido es el del equipo del local? Lo usan /entrenar, cocina, los descuentos y anular facturas."""
+    esperado = token_para(request)
+    return bool(esperado) and secrets.compare_digest(str(recibido or "").encode(), esperado.encode())
+
+
 def _autorizado(request: Request) -> bool:
-    recibido = request.headers.get("x-entrenamiento-token", "")
-    return bool(token_para(request)) and secrets.compare_digest(recibido, TOKEN)
+    return token_valido(request, request.headers.get("x-entrenamiento-token", ""))
 
 
 def _escribir(destino, datos: bytes):

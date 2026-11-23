@@ -12,6 +12,7 @@ filtrando por neighborhoods.name.
 """
 
 import json
+from contextlib import closing
 import os
 import sqlite3
 from datetime import date, datetime, timedelta
@@ -83,6 +84,55 @@ CREATE TABLE IF NOT EXISTS order_payments (
     paid_at TEXT NOT NULL
 );
 
+-- Módulos operativos del final: categorías, usuarios con roles, facturas y pagos.
+CREATE TABLE IF NOT EXISTS categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT
+);
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    role TEXT NOT NULL CHECK (role IN ('admin', 'cajero', 'cocina', 'repartidor', 'cliente')),
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+-- Facturas y anulaciones (notas crédito): solo se agregan, nunca se editan. Cada fila guarda el hash de la anterior
+-- (prev_hash) y el suyo; si alguien cambia una fila, su hash deja de coincidir y la cadena se rompe desde ahí.
+-- order_id sin REFERENCES: al deshacer un pedido se anula su factura (queda en la cadena) y el pedido se borra.
+CREATE TABLE IF NOT EXISTS invoices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    number TEXT NOT NULL UNIQUE,
+    kind TEXT NOT NULL CHECK (kind IN ('FACTURA', 'ANULACION')),
+    order_id INTEGER NOT NULL,
+    refers_to TEXT,
+    subtotal REAL NOT NULL,
+    discount_pct REAL NOT NULL,
+    discount REAL NOT NULL,
+    tax REAL NOT NULL,
+    total REAL NOT NULL,
+    reason TEXT,
+    issued_by TEXT,
+    created_at TEXT NOT NULL,
+    prev_hash TEXT NOT NULL,
+    hash TEXT NOT NULL
+);
+-- Pagos y comprobantes, con su propia cadena de hashes.
+CREATE TABLE IF NOT EXISTS payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL CHECK (kind IN ('PAGO', 'COMPROBANTE')),
+    order_id INTEGER NOT NULL,
+    invoice_number TEXT,
+    method TEXT,
+    amount REAL,
+    id_txn TEXT,
+    receipt_name TEXT,
+    receipt_sha256 TEXT,
+    created_at TEXT NOT NULL,
+    prev_hash TEXT NOT NULL,
+    hash TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS order_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id INTEGER NOT NULL REFERENCES orders(order_id),
@@ -120,6 +170,21 @@ def _seed_if_empty(conn: sqlite3.Connection) -> None:
         cur.executemany(
             "INSERT INTO products (name, category, price) VALUES (?, ?, ?)",
             seed_data.PRODUCTS,
+        )
+
+    cur.execute("SELECT COUNT(*) FROM categories")
+    if cur.fetchone()[0] == 0:
+        cur.executemany(
+            "INSERT OR IGNORE INTO categories (name) VALUES (?)",
+            [(category,) for category in dict.fromkeys(row[0] for row in cur.execute("SELECT category FROM products").fetchall())],
+        )
+
+    cur.execute("SELECT COUNT(*) FROM users")
+    if cur.fetchone()[0] == 0:
+        ahora = datetime.now().isoformat(timespec="seconds")
+        cur.executemany(
+            "INSERT INTO users (name, email, role, created_at) VALUES (?, ?, ?, ?)",
+            [(name, email, role, ahora) for name, email, role in seed_data.USERS],
         )
 
     cur.execute("SELECT COUNT(*) FROM ingredients")
@@ -526,13 +591,6 @@ def daily_totals(channel: Optional[str] = None) -> List[float]:
 # API REST de productos (GET / POST / PUT / PATCH / DELETE)
 # ---------------------------------------------------------------------------
 
-def find_product_by_name(name: str) -> Optional[Product]:
-    conn = _connect()
-    row = conn.execute("SELECT id, name, category, price FROM products WHERE lower(name) = lower(?)", (name,)).fetchone()
-    conn.close()
-    return Product(*row) if row else None
-
-
 def create_product(name: str, category: str, price: float) -> Product:
     conn = _connect()
     cur = conn.execute("INSERT INTO products (name, category, price) VALUES (?, ?, ?)", (name, category, price))
@@ -566,3 +624,132 @@ def delete_product(product_id: int) -> None:
     conn.execute("DELETE FROM products WHERE id = ?", (product_id,))
     conn.commit()
     conn.close()
+
+
+def get_all_orders() -> List[Order]:
+    """Todos los pedidos (para el reporte de calidad y la analítica)."""
+    conn = _connect()
+    rows = conn.execute(_ORDER_SELECT + " ORDER BY o.order_id").fetchall()
+    orders = [_row_to_order(conn, row) for row in rows]
+    conn.close()
+    return orders
+
+
+# ---------------------------------------------------------------------------
+# Categorías y usuarios (CRUD)
+# ---------------------------------------------------------------------------
+# Desde aquí las conexiones van con closing(): se cierran aunque falle un UNIQUE; si quedaran abiertas con la
+# transacción a medias, la base quedaría bloqueada para las siguientes escrituras.
+
+def get_categories() -> List[Tuple[int, str, Optional[str], int]]:
+    """(id, nombre, descripción, cuántos productos la usan)."""
+    with closing(_connect()) as conn:
+        rows = conn.execute(
+            """SELECT c.id, c.name, c.description, COUNT(p.id) FROM categories c
+               LEFT JOIN products p ON p.category = c.name GROUP BY c.id ORDER BY c.name"""
+        ).fetchall()
+        return rows
+
+
+def create_category(name: str, description: Optional[str]) -> int:
+    with closing(_connect()) as conn:
+        cur = conn.execute("INSERT INTO categories (name, description) VALUES (?, ?)", (name, description))
+        conn.commit()
+        return cur.lastrowid
+
+
+def update_category(category_id: int, name: str, description: Optional[str]) -> None:
+    """Renombrar también actualiza los productos que la usan, para no dejar categorías huérfanas."""
+    with closing(_connect()) as conn:
+        (old,) = conn.execute("SELECT name FROM categories WHERE id = ?", (category_id,)).fetchone()
+        conn.execute("UPDATE categories SET name = ?, description = ? WHERE id = ?", (name, description, category_id))
+        conn.execute("UPDATE products SET category = ? WHERE category = ?", (name, old))
+        conn.commit()
+
+
+def delete_category(category_id: int) -> None:
+    with closing(_connect()) as conn:
+        conn.execute("DELETE FROM categories WHERE id = ?", (category_id,))
+        conn.commit()
+
+
+USER_FIELDS = "id, name, email, role, active, created_at"
+
+
+def get_users() -> List[tuple]:
+    with closing(_connect()) as conn:
+        rows = conn.execute(f"SELECT {USER_FIELDS} FROM users ORDER BY id").fetchall()
+        return rows
+
+
+def get_user(user_id: int) -> Optional[tuple]:
+    with closing(_connect()) as conn:
+        row = conn.execute(f"SELECT {USER_FIELDS} FROM users WHERE id = ?", (user_id,)).fetchone()
+        return row
+
+
+def create_user(name: str, email: str, role: str, active: bool) -> int:
+    with closing(_connect()) as conn:
+        cur = conn.execute(
+            "INSERT INTO users (name, email, role, active, created_at) VALUES (?, ?, ?, ?, ?)",
+            (name, email, role, int(active), datetime.now().isoformat(timespec="seconds")),
+        )
+        conn.commit()
+        return cur.lastrowid
+
+
+def update_user(user_id: int, name: str, email: str, role: str, active: bool) -> None:
+    with closing(_connect()) as conn:
+        conn.execute("UPDATE users SET name = ?, email = ?, role = ?, active = ? WHERE id = ?", (name, email, role, int(active), user_id))
+        conn.commit()
+
+
+def delete_user(user_id: int) -> None:
+    with closing(_connect()) as conn:
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Facturas y pagos (filas encadenadas: solo INSERT; el hash lo calcula facturacion.py)
+# ---------------------------------------------------------------------------
+
+INVOICE_FIELDS = ("number", "kind", "order_id", "refers_to", "subtotal", "discount_pct", "discount", "tax", "total",
+                  "reason", "issued_by", "created_at", "prev_hash", "hash")
+PAYMENT_FIELDS = ("kind", "order_id", "invoice_number", "method", "amount", "id_txn", "receipt_name", "receipt_sha256",
+                  "created_at", "prev_hash", "hash")
+
+
+def _chain(table: str, fields: Tuple[str, ...]) -> List[dict]:
+    with closing(_connect()) as conn:
+        rows = conn.execute(f"SELECT id, {', '.join(fields)} FROM {table} ORDER BY id").fetchall()
+        return [dict(zip(("id",) + fields, row)) for row in rows]
+
+
+def get_invoices() -> List[dict]:
+    return _chain("invoices", INVOICE_FIELDS)
+
+
+def get_payments() -> List[dict]:
+    return _chain("payments", PAYMENT_FIELDS)
+
+
+def last_hash(table: str) -> Optional[str]:
+    with closing(_connect()) as conn:
+        row = conn.execute(f"SELECT hash FROM {table} ORDER BY id DESC LIMIT 1").fetchone()
+        return row[0] if row else None
+
+
+def count_invoices(kind: str) -> int:
+    with closing(_connect()) as conn:
+        (n,) = conn.execute("SELECT COUNT(*) FROM invoices WHERE kind = ?", (kind,)).fetchone()
+        return n
+
+
+def insert_chained(table: str, row: dict) -> None:
+    """Agrega una fila al final de la cadena (`row` ya trae prev_hash y hash)."""
+    fields = INVOICE_FIELDS if table == "invoices" else PAYMENT_FIELDS
+    with closing(_connect()) as conn:
+        conn.execute(f"INSERT INTO {table} ({', '.join(fields)}) VALUES ({', '.join('?' * len(fields))})",
+                     tuple(row[f] for f in fields))
+        conn.commit()

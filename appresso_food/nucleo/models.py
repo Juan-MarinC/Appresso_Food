@@ -65,6 +65,10 @@ class Order:
     pay_key: Optional[str] = field(default_factory=lambda: secrets.token_urlsafe(16))
     paid_txn: Optional[str] = None  # idTxn de la pasarela con que se pagó
 
+    def clave_valida(self, clave: str) -> bool:
+        """¿Es la clave de la confirmación? Comparación en tiempo constante (no revela cuántos caracteres acertó)."""
+        return bool(self.pay_key) and secrets.compare_digest(str(clave or "").encode(), self.pay_key.encode())
+
     @property
     def total(self) -> float:
         return sum(item.subtotal for item in self.items)

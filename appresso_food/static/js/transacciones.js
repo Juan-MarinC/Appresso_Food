@@ -96,8 +96,14 @@
         const res = await api(`/api/pedidos/${pedido}/pago`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idTxn, clave: params.get("clave") || "" }) });
         const detalle = res.data && res.data.detail;
         $("pagando").className = `banner ${res.ok ? "ok" : "bad"}`;
-        $("pagando").textContent = res.ok ? `Pedido #${pedido} pagado con la transacción ${idTxn}.`
+        $("pagando").textContent = res.ok ? `Pedido #${pedido} pagado con la transacción ${idTxn}. `
             : `El pedido #${pedido} no quedó pagado: ${typeof detalle === "string" ? detalle : "revisa el valor y vuelve a intentar"}`;
+        if (res.ok) {  // vuelve al pedido para ver la factura y adjuntar el comprobante
+            const volver = document.createElement("a");
+            volver.href = `/pedidos/${pedido}?clave=${encodeURIComponent(params.get("clave") || "")}`;
+            volver.textContent = "Ver mi pedido y adjuntar el comprobante";
+            $("pagando").appendChild(volver);
+        }
         $("pagando").scrollIntoView({ block: "center", behavior: "smooth" });  // queda arriba del formulario
     }
 

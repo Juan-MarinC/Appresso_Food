@@ -1,0 +1,12 @@
+{# Estado de las cadenas de hashes (facturas y pagos) y de los comprobantes. Lo usan /panel y /facturas. #}
+{% for nombre, cadena in (("Facturas", integridad.facturas), ("Pagos y comprobantes", integridad.pagos)) %}
+<p class="integridad {{ 'integridad--ok' if cadena.ok else 'integridad--rota' }}">
+  <strong>{{ nombre }}:</strong>
+  {% if cadena.ok %}cadena íntegra, {{ cadena.registros }} registros.{% else %}la cadena se rompe en el registro {{ cadena.roto_en }}: {{ cadena.motivo }}{% endif %}
+</p>
+{% endfor %}
+{% for c in integridad.comprobantes_con_problema %}
+<p class="integridad integridad--rota"><strong>Comprobante del pedido #{{ c.pedido }}</strong> ({{ c.archivo }}): {{ c.problema }}</p>
+{% else %}
+<p class="integridad integridad--ok"><strong>Comprobantes:</strong> todos coinciden con su huella SHA-256.</p>
+{% endfor %}

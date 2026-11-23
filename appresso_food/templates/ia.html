@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% set pagina = "ia" %}
+
+{% block titulo %}Inteligencia artificial - Appresso Food{% endblock %}
+
+{% block hero %}
+<section class="pagina-cabeza">
+  <div class="pagina-cabeza__fila">
+    <h1>Inteligencia artificial</h1>
+    <p>Clasificador de operaciones con TensorFlow.js (API de capas de Keras) y anomalías y demanda con Simple Statistics. Todo se entrena aquí, en el navegador.</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block contenido %}
+<p class="aviso-admin aviso-admin--error" id="ia-error" role="alert" hidden></p>
+
+<div class="summary">
+  <div class="card"><div class="label">Operaciones</div><div class="value" id="ia-total">…</div><small>transacciones de la pasarela</small></div>
+  <div class="card"><div class="label">Fraudulentas</div><div class="value" id="ia-fraude">…</div><small>sospechosas, firma alterada o duplicadas</small></div>
+  <div class="card"><div class="label">Precisión del modelo</div><div class="value" id="ia-accuracy">—</div><small>con datos que no vio</small></div>
+  <div class="card"><div class="label">Fraudes detectados</div><div class="value" id="ia-recall">—</div><small>sensibilidad (recall)</small></div>
+</div>
+
+<div class="panel">
+  <h2>1. Clasificador de operaciones: normal o fraudulenta</h2>
+  <p class="subtitle">Entrada por operación: <strong>monto</strong>, <strong>hora y día</strong> (fecha), <strong>método de pago</strong>,
+    <strong>firma</strong> (HMAC válida, ausente o alterada), <strong>frecuencia</strong> (operaciones del usuario en la ventana de 10 s)
+    y <strong>operaciones del usuario</strong>. Salida: probabilidad de fraude. La etiqueta sale de lo que detectó el antifraude.</p>
+  <ol class="ia-pasos">
+    <li><strong>Normalización (TensorFlow):</strong> media y desviación con <code>tf.moments</code>; cada entrada queda como (x − μ) / σ.</li>
+    <li><strong>Aumento de datos (TensorFlow):</strong> hay muy pocas fraudulentas, así que se duplican con ruido gaussiano (<code>tf.randomNormal</code>) hasta ser ~30 % del entrenamiento.</li>
+    <li><strong>Red (Keras / <code>tf.sequential</code>):</strong> Dense 16 ReLU → Dropout 0,2 → Dense 8 ReLU → Dense 1 sigmoide; Adam y entropía cruzada binaria.</li>
+    <li><strong>Evaluación:</strong> 20 % de las operaciones se aparta y el modelo no la ve al entrenar.</li>
+  </ol>
+  <div class="actions">
+    <button type="button" class="primary-btn ia-boton" id="btn-entrenar" disabled>Entrenar</button>
+    <button type="button" class="button secondary" id="btn-cargar" disabled>Cargar modelo guardado</button>
+    <button type="button" class="button secondary" id="btn-descargar" disabled>Descargar modelo</button>
+  </div>
+  <p class="subtitle" id="ia-estado" aria-live="polite">Cargando TensorFlow.js y las operaciones…</p>
+  <svg class="ia-grafica" id="ia-perdida" viewBox="0 0 600 140" role="img" aria-label="Pérdida por época"></svg>
+
+  <div class="content-grid" id="ia-resultados" hidden>
+    <div>
+      <h3>Matriz de confusión (datos de prueba)</h3>
+      <table class="ia-matriz">
+        <tr><th></th><th>Predijo normal</th><th>Predijo fraude</th></tr>
+        <tr><th>Era normal</th><td id="m-vn"></td><td id="m-fp"></td></tr>
+        <tr><th>Era fraude</th><td id="m-fn"></td><td id="m-vp"></td></tr>
+      </table>
+      <p class="subtitle" id="ia-metricas"></p>
+    </div>
+    <div>
+      <h3>Probar una operación</h3>
+      <form id="ia-probar" class="form-admin">
+        <div class="field-group"><label for="p-monto">Monto (COP)</label><input type="number" id="p-monto" value="45000" min="1" step="1"></div>
+        <div class="field-group"><label for="p-hora">Hora (0–23)</label><input type="number" id="p-hora" value="14" min="0" max="23"></div>
+        <div class="field-group"><label for="p-metodo">Método de pago</label><select id="p-metodo"><option>Tarjeta</option><option>Nequi</option><option>Crédito</option><option>Otro</option></select></div>
+        <div class="field-group"><label for="p-firma">Firma</label><select id="p-firma"><option value="0">Sin firma</option><option value="1">Firma válida</option><option value="-1">Firma alterada</option></select></div>
+        <div class="field-group"><label for="p-frecuencia">Operaciones del usuario en 10 s</label><input type="number" id="p-frecuencia" value="1" min="1" max="50"></div>
+        <button type="submit" class="button secondary">Clasificar</button>
+        <p class="ia-veredicto" id="p-resultado" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+
+  <h3 id="ia-tabla-titulo" hidden>Cada operación clasificada (las 25 más recientes)</h3>
+  <div class="tabla-scroll"><table id="ia-tabla"></table></div>
+</div>
+
+<div class="content-grid">
+  <div class="panel">
+    <h2>2. Anomalías por usuario (Simple Statistics)</h2>
+    <p class="subtitle" id="ss-montos">Calculando…</p>
+    <div class="tabla-scroll"><table id="ss-usuarios"></table></div>
+    <p class="subtitle">Puntaje = |z| del monto más alto del usuario más |z| de su frecuencia. Alerta con puntaje &gt; 3 o montos fuera de Q1 − 1,5·RIC … Q3 + 1,5·RIC.</p>
+  </div>
+  <div class="panel">
+    <h2>Empleados: descuentos y anulaciones</h2>
+    <div class="tabla-scroll"><table id="ss-empleados"></table></div>
+    <p class="subtitle">Con <code>ss.quantile</code> e <code>ss.interquartileRange</code> sobre el descuento promedio de cada empleado: alerta si supera Q3 + 1,5·RIC o anula más de la mitad de lo que factura.</p>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>3. Predicción de demanda</h2>
+  <p class="subtitle" id="dem-origen"></p>
+  <svg class="ia-grafica ia-grafica--alta" id="dem-grafica" viewBox="0 0 600 200" role="img" aria-label="Unidades por día y predicción"></svg>
+  <div class="tabla-scroll"><table id="dem-tabla"></table></div>
+  <p class="subtitle" id="dem-error"></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js" integrity="sha384-vE8hbVJ4lezako5rlvE7bY0BVzWlFhZncPlckrqNwcUQpVtgbENTgZ8TBbnPjZre" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/simple-statistics@7.8.8/dist/simple-statistics.min.js" integrity="sha384-hWBkNudBF0+J1E3RfN9lX/EXNrik6qH7gEBzRJIMthXRvDaAmgeVDqs07yYcrehb" crossorigin="anonymous"></script>
+<script src="/static/js/fraud-common.js"></script>
+<script src="/static/js/ia.js?v=3"></script>
+{% endblock %}
