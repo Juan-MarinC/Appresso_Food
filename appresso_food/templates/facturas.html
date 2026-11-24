@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% set pagina = "facturas" %}
+
+{% block titulo %}Facturas - Appresso Food{% endblock %}
+
+{% block hero %}
+<section class="pagina-cabeza">
+  <div class="pagina-cabeza__fila">
+    <h1>Facturas y pagos</h1>
+    <p>Consecutivo, impuesto al consumo (8 %) incluido, descuentos y anulaciones. Cada registro guarda el hash del anterior.</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block contenido %}
+<div class="panel">
+  <h2>Integridad</h2>
+  {% include "_integridad.html" %}
+  <p class="subtitle">hash = SHA-256(datos del registro + hash del anterior). Si alguien cambia una factura, borra o inserta una fila, la verificación dice en cuál.</p>
+</div>
+
+{% if not token %}<div class="warning-banner">Solo lectura: las facturas se anulan desde el equipo del local.</div>{% endif %}
+
+<div class="panel" style="margin-top: 18px;">
+  <h2>Facturas</h2>
+  <div class="tabla-scroll"><table>
+    <tr><th>Número</th><th>Pedido</th><th>Subtotal</th><th>Descuento</th><th>Impuesto</th><th>Total</th><th>Emitida por</th><th>Fecha</th><th>Hash</th><th></th></tr>
+    {% for f in facturas %}
+    <tr {% if f.kind == 'ANULACION' or f.anulada %}class="fila-anulada"{% endif %}>
+      <td><strong>{{ f.number }}</strong>{% if f.kind == 'ANULACION' %}<br><small>anula {{ f.refers_to }}: {{ f.reason }}</small>{% endif %}</td>
+      <td>#{{ f.order_id }}</td>
+      <td>{{ f.subtotal|pesos }}</td>
+      <td>{% if f.discount %}{{ f.discount|pesos }} ({{ f.discount_pct|round(1) }} %){% else %}—{% endif %}</td>
+      <td>{{ f.tax|pesos }}</td>
+      <td><strong>{{ f.total|pesos }}</strong></td>
+      <td>{{ f.issued_by or "—" }}</td>
+      <td>{{ f.created_at.replace('T', ' ') }}</td>
+      <td><code title="{{ f.hash }}">{{ f.hash[:10] }}…</code></td>
+      <td>
+        {% if f.kind == 'FACTURA' and not f.anulada and token %}
+        <form class="anular" data-numero="{{ f.number }}"><input name="motivo" placeholder="Motivo" required maxlength="200" aria-label="Motivo para anular {{ f.number }}"><button type="submit" class="button secondary">Anular</button></form>
+        {% elif f.anulada %}<small>anulada</small>{% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="10" class="empty">Aún no hay facturas: se emiten al crear cada pedido.</td></tr>
+    {% endfor %}
+  </table></div>
+</div>
+
+<div class="panel" style="margin-top: 18px;">
+  <h2>Pagos y comprobantes</h2>
+  <div class="tabla-scroll"><table>
+    <tr><th>Tipo</th><th>Pedido</th><th>Factura</th><th>Método</th><th>Monto</th><th>Transacción / archivo</th><th>Fecha</th><th>Hash</th></tr>
+    {% for p in pagos %}
+    <tr>
+      <td>{{ "Pago" if p.kind == 'PAGO' else "Comprobante" }}</td>
+      <td>#{{ p.order_id }}</td>
+      <td>{{ p.invoice_number or "—" }}</td>
+      <td>{{ p.method or "—" }}</td>
+      <td>{{ p.amount|pesos if p.amount else "—" }}</td>
+      <td>{% if p.kind == 'PAGO' %}<code>{{ p.id_txn }}</code>{% else %}{{ p.receipt_name }}<br><small title="{{ p.receipt_sha256 }}">SHA-256 {{ p.receipt_sha256[:12] }}…</small>{% endif %}</td>
+      <td>{{ p.created_at.replace('T', ' ') }}</td>
+      <td><code title="{{ p.hash }}">{{ p.hash[:10] }}…</code></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8" class="empty">Aún no hay pagos.</td></tr>
+    {% endfor %}
+  </table></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Anular: se envía con el token del equipo (solo llega a quien abre esta página en el equipo del local).
+  document.querySelectorAll("form.anular").forEach((form) => form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const res = await fetch(`/api/facturas/${form.dataset.numero}/anular`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ motivo: form.motivo.value, token: {{ token|tojson }} }),
+    });
+    const r = await res.json();
+    if (res.ok) location.reload(); else alert(r.mensaje || "No se pudo anular.");
+  }));
+</script>
+{% endblock %}

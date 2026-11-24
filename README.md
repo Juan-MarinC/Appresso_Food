@@ -7,6 +7,21 @@ por completo el dominio: ahora gestiona pedidos de comida rápida por dos
 canales (local y domicilio), calcula rutas de entrega con un grafo de
 barrios y prioriza despachos con un heap.
 
+## Proyecto final: cómo se cubre cada requisito
+
+| Criterio | Dónde está en la app |
+|---|---|
+| **Base de datos (5 %)** | SQLite (`nucleo/storage.py`): productos, categorías, usuarios, ingredientes, barrios, pedidos, ítems, facturas y pagos. MongoDB: transacciones, usuarios, anomalías y logs de la pasarela. |
+| **Módulos operativos (15 %)** | CRUD de usuarios con roles (`/api/usuarios`, roles admin, cajero, cocina, repartidor y cliente), de categorías (`/api/categorias`) y de ítems (`/api/productos`); página `/administracion`. Pedidos con varios ítems, canal (local o domicilio) y estado que descuentan inventario. Facturas con consecutivo `FV-000001`, impuesto al consumo del 8 % incluido y descuento de cajero de 0 a 30 %; anulaciones como nota crédito `NC-…`. Pagos por la pasarela con distintos métodos y comprobante adjunto (PNG, JPG o PDF). Página `/facturas`. |
+| **Algoritmos y análisis experimental (30 %)** | `/laboratorio`: búsqueda lineal y suma O(n), recursividad, conteo de pedidos por cliente O(n²) contra O(n), ordenamiento simple (inserción) O(n²) contra ordenamiento por fecha (merge sort) O(n log n), ranking de ítems más vendidos y normalización de nombres. Cuenta operaciones y tiempo hasta n = 25.000 (los O(n²) se estiman por encima de 1.000), con CSV para el informe. La optimización documentada (O(n²) → O(n)) muestra la mejora en cada tamaño. |
+| **Limpieza y calidad (10 %)** | `nucleo/limpieza.py`: espacios, nombres de persona, claves sin tildes, precios mal escritos (`$12.000`, `12,000.50`) y duplicados. Se aplica al crear pedidos (cliente), productos (duplicados y categoría unificada) y usuarios (nombre y correo). Reporte en `/api/calidad` y en el panel, con puntaje. La pasarela valida el esquema de cada transacción y guarda las erróneas. |
+| **Integridad (10 %)** | `nucleo/facturacion.py`: facturas y pagos encadenados (`hash = SHA-256(datos + hash anterior)`). `/api/integridad` dice si alguien cambió, borró o insertó un registro y en cuál; los comprobantes se guardan con su huella SHA-256 y se detecta si los alteran. Las transacciones de la pasarela llevan HMAC-SHA256. |
+| **Modelos de IA (30 %)** | `/ia`, entrenado en el navegador. **Clasificador de operaciones normal/fraudulenta** con TensorFlow.js (API de capas de Keras): entrada de monto, hora y día, método de pago, firma (válida, ausente o alterada), frecuencia en la ventana e historial del usuario; normalización con `tf.moments`, aumento de datos con ruido gaussiano para balancear las clases, evaluación con 20 % de prueba (matriz de confusión, precisión, sensibilidad y F1), guardar y cargar el modelo (IndexedDB y descarga) y clasificación de cada operación. **Simple Statistics:** perfil por usuario (cuartiles, RIC, puntaje z de monto y frecuencia, alertas) y por empleado (descuentos y anulaciones), y regresión lineal de demanda comparada con una red de TensorFlow sobre los últimos 7 días. Además, el kiosko `/gestos` con ml5.js (`neuralNetwork`) clasifica 8 gestos. Datos: `/api/ia/operaciones` (usuario seudonimizado) y `/api/ia/demanda`. |
+| **Panel** | `/panel`: ventas, alertas antifraude, métricas del modelo de fraude, patrones (cuartiles de montos y atípicos, pedidos por hora, canal y clientes frecuentes), descuentos y anulaciones por empleado con alerta, calidad de datos, integridad y benchmark. |
+
+Para demostrar la integridad: cambie un total en la base (`UPDATE invoices SET total = 1 WHERE number = 'FV-000001'`)
+y abra `/facturas` o `/api/integridad`: indica el registro donde se rompe la cadena.
+
 ## Estado actual
 
 Lo que se pidió y qué tiene hoy la app. Todo lo marcado ✅ está implementado y
@@ -418,7 +433,7 @@ Cómo ejecutarlo: ver "Cómo ejecutar la app" más arriba (necesita MongoDB).
 | `APPRESSO_PAYMENT_METHODS` | `Tarjeta,Efectivo,Nequi,Daviplata,PSE,Transferencia` | Métodos válidos |
 | `APPRESSO_HASH_HELPER` | `true` | Habilita `POST /api/transactions/hash` (firma desde el formulario) |
 | `APPRESSO_LENIENT_INPUTS` | `true` | Modo generador externo: `user` como correo o id simple, método de pago libre, hash SHA-256 sin llave |
-| `APPRESSO_REJECTED_AS_201` | `true` | Una petición recibida que queda RECHAZADA (o cuerpo roto) responde 201 con el resultado en el cuerpo y se guarda en la cuarentena; `false` devuelve 422 / 400 |
+| `APPRESSO_REJECTED_AS_201` | `false` | Con `true`, una petición que queda RECHAZADA (o cuerpo roto) responde 201 con el resultado en el cuerpo, para generadores que toman cualquier 4xx como fallo. Por defecto responde su código real (422 / 400) |
 
 ### Flujo de `POST /api/transactions`
 
@@ -438,7 +453,7 @@ Cuerpo (los nombres de campo son los del PDF; `nombre`, `cedula` y `hash` son op
 El formulario web sí exige `nombre` y `cedula`; por API, si llegan se validan igual que el resto y si no
 llegan no pasa nada. Si faltan campos obligatorios, la respuesta incluye `formato_esperado` con un ejemplo.
 
-Respuestas: `201` válida o sospechosa, `422` rechazada, `409` ID duplicado,
+Respuestas: `201` válida, `202` sospechosa (entró y quedó guardada, pero marcada como posible fraude), `422` rechazada, `409` ID duplicado,
 `400` JSON mal formado, `503` sin MongoDB.
 
 ### Ventana deslizante

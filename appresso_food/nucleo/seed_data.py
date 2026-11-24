@@ -84,3 +84,10 @@ EDGES = [
     ("Itagüí", "Envigado", 4.1),
 ]
 
+# Usuarios del equipo (ficticios) con su rol. Los roles válidos están en el CHECK de la tabla users.
+USERS = [
+    ("Laura Gómez", "laura.admin@appresso.test", "admin"),
+    ("Carlos Ruiz", "carlos.caja@appresso.test", "cajero"),
+    ("Marta Díaz", "marta.cocina@appresso.test", "cocina"),
+    ("Andrés Soto", "andres.domicilios@appresso.test", "repartidor"),
+]

@@ -25,6 +25,7 @@ from appresso_food.api.api_helpers import error_response, json_body, read_json_o
 from appresso_food.antifraude.fraud_config import FraudConfig
 from appresso_food.antifraude.fraud_validation import EMPTY_FIELD, INVALID_NAME, INVALID_TYPE, NULL_FIELD, FieldError, parse_value
 from appresso_food.nucleo.models import Product
+from appresso_food.nucleo.limpieza import clave
 
 router = APIRouter()
 
@@ -107,8 +108,17 @@ def _get_or_404(product_id: int, ayuda: str = "") -> Product:
     return product
 
 
+def _categoria_canonica(nombre: str) -> str:
+    """Limpieza en la frontera: "bebidas " o "Bébidas" usan la categoría existente "Bebidas"; una nueva se crea."""
+    existente = next((c[1] for c in storage.get_categories() if clave(c[1]) == clave(nombre)), None)
+    if existente is None:
+        storage.create_category(nombre, None)
+    return existente or nombre
+
+
 def _name_taken(name: str, own_id: Optional[int] = None) -> Optional[JSONResponse]:
-    other = storage.find_product_by_name(name)
+    # Duplicado aunque cambien tildes, mayúsculas o signos: "Papas  fritas" = "papas fritas" = "Papás Fritas".
+    other = next((p for p in storage.get_products() if clave(p.name) == clave(name)), None)
     if other and other.id != own_id:
         return error_response(409, "NOMBRE_DUPLICADO", f"Ya existe un producto llamado '{other.name}' (id {other.id}). Los nombres no se pueden repetir.")
     return None
@@ -158,6 +168,8 @@ async def create_product(request: Request):
     if error:
         return error
     clean, errors, ignored = _validate(data, required=("nombre", "precio"))
+    if "categoria" in clean:
+        clean["categoria"] = _categoria_canonica(clean["categoria"])
     if errors:
         return _invalid(errors, ignored)
     conflict = _name_taken(clean["nombre"])
@@ -166,7 +178,7 @@ async def create_product(request: Request):
     if len(storage.get_products()) >= MAX_PRODUCTOS:
         return error_response(409, "LIMITE_PRODUCTOS", f"Ya hay {MAX_PRODUCTOS} productos: elimine alguno de los que creó antes de agregar otro.")
     try:
-        product = storage.create_product(clean["nombre"], clean.get("categoria", DEFAULT_CATEGORY), clean["precio"])
+        product = storage.create_product(clean["nombre"], clean.get("categoria") or _categoria_canonica(DEFAULT_CATEGORY), clean["precio"])
     except sqlite3.IntegrityError:
         return error_response(409, "NOMBRE_DUPLICADO", f"Ya existe un producto llamado '{clean['nombre']}'.")
     notes = [] if "categoria" in clean else [f"No se envió 'categoria': se usó '{DEFAULT_CATEGORY}'."]
@@ -184,13 +196,15 @@ async def replace_product(product_id: int, request: Request):
     if error:
         return error
     clean, errors, ignored = _validate(data, required=("nombre", "precio"))
+    if "categoria" in clean:
+        clean["categoria"] = _categoria_canonica(clean["categoria"])
     if errors:
         return _invalid(errors, ignored, "PUT reemplaza el producto COMPLETO: envíe nombre y precio (y categoria). "
                                          "Para cambiar solo algunos campos use PATCH.")
     conflict = _name_taken(clean["nombre"], product_id)
     if conflict:
         return conflict
-    product = storage.update_product(product_id, clean["nombre"], clean.get("categoria", DEFAULT_CATEGORY), clean["precio"])
+    product = storage.update_product(product_id, clean["nombre"], clean.get("categoria") or _categoria_canonica(DEFAULT_CATEGORY), clean["precio"])
     notes = [] if "categoria" in clean else [f"PUT reemplaza todo: como no se envió 'categoria', quedó '{DEFAULT_CATEGORY}'. Use PATCH para conservarla."]
     return _ok(200, f"Producto {product_id} reemplazado completo (PUT).", product, ignored, hash_check, antes=_public(before), notas=notes)
 
@@ -206,6 +220,8 @@ async def patch_product(product_id: int, request: Request):
     if error:
         return error
     clean, errors, ignored = _validate(data, required=())
+    if "categoria" in clean:
+        clean["categoria"] = _categoria_canonica(clean["categoria"])
     if errors:
         return _invalid(errors, ignored)
     if not clean:

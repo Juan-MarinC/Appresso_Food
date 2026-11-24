@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% set pagina = "administracion" %}
+
+{% block titulo %}Administración - Appresso Food{% endblock %}
+
+{% block hero %}
+<section class="pagina-cabeza">
+  <div class="pagina-cabeza__fila">
+    <h1>Administración</h1>
+    <p>Usuarios con roles y categorías del menú. Los ítems se administran en <a href="/docs#/default/list_products_api_productos_get">/api/productos</a>.</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block contenido %}
+<p class="aviso-admin" id="aviso" role="status" aria-live="polite" hidden></p>
+
+<div class="content-grid">
+  <div class="panel">
+    <h2>Usuarios</h2>
+    <form id="form-usuario" class="form-admin">
+      <div class="field-group"><label for="u-nombre">Nombre</label><input type="text" id="u-nombre" required maxlength="80" placeholder="Ana López"></div>
+      <div class="field-group"><label for="u-email">Correo</label><input type="text" id="u-email" required maxlength="120" placeholder="ana@correo.com" inputmode="email"></div>
+      <div class="field-group"><label for="u-rol">Rol</label>
+        <select id="u-rol">{% for rol in ("cajero", "cocina", "repartidor", "admin", "cliente") %}<option value="{{ rol }}">{{ rol }}</option>{% endfor %}</select></div>
+      <button type="submit" class="primary-btn">Crear usuario</button>
+    </form>
+    <div class="tabla-scroll"><table><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Activo</th><th></th></tr></thead><tbody id="usuarios"></tbody></table></div>
+  </div>
+
+  <div class="panel">
+    <h2>Categorías</h2>
+    <form id="form-categoria" class="form-admin">
+      <div class="field-group"><label for="c-nombre">Nombre</label><input type="text" id="c-nombre" required maxlength="60" placeholder="Postres"></div>
+      <div class="field-group"><label for="c-desc">Descripción (opcional)</label><input type="text" id="c-desc" maxlength="200"></div>
+      <button type="submit" class="primary-btn">Crear categoría</button>
+    </form>
+    <div class="tabla-scroll"><table><thead><tr><th>Categoría</th><th>Productos</th><th></th></tr></thead><tbody id="categorias"></tbody></table></div>
+    <p class="subtitle">"postres " y "Postrés" cuentan como la misma: no se puede repetir. Una categoría que usan productos no se borra.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/fraud-common.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = window.Fraud.esc;  // escape HTML compartido (fraud-common.js)
+
+  function avisar(texto, error) {
+    $("aviso").hidden = false;
+    $("aviso").textContent = texto;
+    $("aviso").className = "aviso-admin" + (error ? " aviso-admin--error" : "");
+  }
+
+  async function api(metodo, ruta, cuerpo) {
+    const res = await fetch(ruta, { method: metodo, headers: cuerpo ? { "Content-Type": "application/json" } : {}, body: cuerpo ? JSON.stringify(cuerpo) : undefined });
+    const datos = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(datos.mensaje || datos.detail || `Error ${res.status}`);
+    return datos;
+  }
+
+  async function cargar() {
+    const [usuarios, categorias] = await Promise.all([api("GET", "/api/usuarios"), api("GET", "/api/categorias")]);
+    $("usuarios").innerHTML = usuarios.map((u) => `<tr><td>${esc(u.nombre)}</td><td>${esc(u.email)}</td><td>${esc(u.rol)}</td><td>${u.activo ? "Sí" : "No"}</td>
+      <td><button type="button" class="button secondary" data-borrar-usuario="${u.id}" aria-label="Eliminar a ${esc(u.nombre)}">Eliminar</button></td></tr>`).join("");
+    $("categorias").innerHTML = categorias.map((c) => `<tr><td>${esc(c.nombre)}${c.descripcion ? `<br><small>${esc(c.descripcion)}</small>` : ""}</td><td>${c.productos}</td>
+      <td><button type="button" class="button secondary" data-borrar-categoria="${c.id}" aria-label="Eliminar la categoría ${esc(c.nombre)}">Eliminar</button></td></tr>`).join("");
+  }
+
+  async function intentar(accion, exito) {
+    try { const r = await accion(); avisar(r.mensaje || exito); await cargar(); } catch (e) { avisar(e.message, true); }
+  }
+
+  $("form-usuario").addEventListener("submit", (e) => {
+    e.preventDefault();
+    intentar(() => api("POST", "/api/usuarios", { nombre: $("u-nombre").value, email: $("u-email").value, rol: $("u-rol").value }), "Usuario creado.")
+      .then(() => e.target.reset());
+  });
+  $("form-categoria").addEventListener("submit", (e) => {
+    e.preventDefault();
+    intentar(() => api("POST", "/api/categorias", { nombre: $("c-nombre").value, descripcion: $("c-desc").value || null }), "Categoría creada.")
+      .then(() => e.target.reset());
+  });
+  document.addEventListener("click", (e) => {
+    const u = e.target.dataset.borrarUsuario, c = e.target.dataset.borrarCategoria;
+    if (u) intentar(() => api("DELETE", `/api/usuarios/${u}`), "Usuario eliminado.");
+    if (c) intentar(() => api("DELETE", `/api/categorias/${c}`), "Categoría eliminada.");
+  });
+  cargar().catch((e) => avisar(e.message, true));
+})();
+</script>
+{% endblock %}

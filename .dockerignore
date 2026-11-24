@@ -17,3 +17,5 @@ tests
 docs
 Dockerfile
 docker-compose.yml
+# Comprobantes de pago que suben los clientes: datos personales, nunca al repo ni a la imagen
+appresso_food/comprobantes

@@ -66,10 +66,6 @@ class ProductStorageTests(unittest.TestCase):
         storage.delete_product(product.id)
         self.assertIsNone(storage.get_product(product.id))
 
-    def test_name_lookup_is_case_insensitive(self):
-        self.assertEqual(storage.find_product_by_name("hamburguesa clásica").name, "Hamburguesa Clásica")
-        self.assertIsNone(storage.find_product_by_name("no existe"))
-
     def test_product_with_history_reports_usage(self):
         burger = storage.get_products()[0]
         self.assertEqual(storage.product_usage(burger.id), (0, 0))

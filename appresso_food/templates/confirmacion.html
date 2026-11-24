@@ -37,10 +37,17 @@
             <strong>{{ 'a domicilio' if order.channel == 'domicilio' else 'para llevar' if order.para_llevar else 'para comer aquí' }}</strong>.
         </p>
         {% if order.notas %}<p class="subtitle" id="notas-cocina">Para cocina: <strong>{{ order.notas }}</strong></p>{% endif %}
+        {% set a_pagar = factura.total if factura else order.total %}
         {% if order.paid_txn %}
         <p class="subtitle" id="pagado">✅ Pagado con la transacción <strong>{{ order.paid_txn }}</strong>.</p>
+        <form class="comprobante" id="comprobante" data-pedido="{{ order.order_id }}" data-clave="{{ order.pay_key }}">
+            <label for="comprobante-archivo">Adjuntar comprobante de pago (PNG, JPG o PDF, máx. 2 MB)</label>
+            <input type="file" id="comprobante-archivo" accept=".png,.jpg,.jpeg,.pdf" required>
+            <button type="submit" class="button secondary">Adjuntar</button>
+            <p class="subtitle" id="comprobante-estado" aria-live="polite"></p>
+        </form>
         {% else %}
-        <a class="boton" id="pagar" href="/transacciones?pedido={{ order.order_id }}&valor={{ order.total|int }}&clave={{ order.pay_key }}">Pagar {{ order.total|pesos }}</a>
+        <a class="boton" id="pagar" href="/transacciones?pedido={{ order.order_id }}&valor={{ a_pagar|int }}&clave={{ order.pay_key }}">Pagar {{ a_pagar|pesos }}</a>
         {% endif %}
 
         <table>
@@ -48,8 +55,16 @@
             {% for item in order.items %}
             <tr><td>{{ item.product_name }}</td><td>{{ item.quantity }}</td><td>{{ item.subtotal|pesos }}</td></tr>
             {% endfor %}
+            {% if factura %}
+            <tr><td colspan="2">Subtotal</td><td>{{ factura.subtotal|pesos }}</td></tr>
+            {% if factura.discount %}<tr><td colspan="2">Descuento ({{ factura.discount_pct|round(1) }} %)</td><td>−{{ factura.discount|pesos }}</td></tr>{% endif %}
+            <tr><td colspan="2"><strong>Total</strong></td><td><strong>{{ factura.total|pesos }}</strong></td></tr>
+            <tr><td colspan="2"><small>Incluye impuesto al consumo (8 %)</small></td><td><small>{{ factura.tax|pesos }}</small></td></tr>
+            {% else %}
             <tr><td colspan="2"><strong>Total</strong></td><td><strong>{{ order.total|pesos }}</strong></td></tr>
+            {% endif %}
         </table>
+        {% if factura %}<p class="subtitle" id="factura">Factura <strong>{{ factura.number }}</strong> · {{ factura.created_at.replace('T', ' ') }}</p>{% endif %}
 
         {% if order.channel == 'domicilio' %}
         <div class="route-info">
@@ -64,4 +79,31 @@
             <a class="button secondary" href="/clientes/{{ order.client }}">Mis pedidos</a>
         </div>
     </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Comprobante: se sube con la misma clave del pedido; el servidor guarda su huella SHA-256 en la cadena de pagos.
+    (function () {
+        const form = document.getElementById("comprobante");
+        if (!form) return;
+        form.addEventListener("submit", async function (e) {
+            e.preventDefault();
+            const archivo = document.getElementById("comprobante-archivo").files[0];
+            const estado = document.getElementById("comprobante-estado");
+            if (!archivo) return;
+            const datos = new FormData();
+            datos.append("archivo", archivo);
+            datos.append("clave", form.dataset.clave);
+            estado.textContent = "Subiendo…";
+            try {
+                const res = await fetch(`/api/pedidos/${form.dataset.pedido}/comprobante`, { method: "POST", body: datos });
+                const r = await res.json();
+                estado.textContent = res.ok ? `Comprobante guardado. Huella SHA-256: ${r.sha256.slice(0, 16)}…` : (r.mensaje || r.detail || "No se pudo guardar.");
+            } catch (err) {
+                estado.textContent = "No se pudo conectar con el servidor.";
+            }
+        });
+    })();
+</script>
 {% endblock %}

@@ -13,8 +13,12 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response
 from appresso_food.antifraude import fraud_routes
 from appresso_food.antifraude.fraud_service import STATUS_VALID
 from appresso_food.api import gestos_api
-from appresso_food.nucleo import mapa, ranking, runtime, storage
-from appresso_food.nucleo.algorithms import find_order_linear, recursive_total_units, total_units_sold
+from appresso_food.nucleo import analitica, facturacion, mapa, ranking, runtime, storage
+from appresso_food.nucleo.limpieza import duplicados, duplicados_ingenuo, nombre_propio, normalizar_texto, reporte_calidad
+from appresso_food.nucleo.algorithms import (
+    count_orders_per_client, count_orders_per_client_naive, find_order_linear, insertion_sort_by_total, merge_sort_by_date,
+    recursive_total_units, top_items, total_units_sold,
+)
 from appresso_food.nucleo.counter import OperationCounter
 from appresso_food.nucleo.demo_data import generate_demo_orders
 from appresso_food.nucleo.graph import RESTAURANT_NODE
@@ -77,6 +81,7 @@ def _common_context(request: Request) -> dict:
         "popular_product_names": {name for name, _ in top},
         "served_by": request.cookies.get(SERVED_BY_COOKIE, ""),
         "pedido_token": secrets.token_urlsafe(16),  # cada formulario nuevo trae el suyo
+        "token_equipo": gestos_api.token_para(request) or "",  # solo el equipo del local puede dar descuentos
     }
 
 
@@ -164,7 +169,7 @@ def pay_order(order_id: int, idTxn: str = Body(..., min_length=1, max_length=64)
     order = storage.get_order(order_id)
     if order is None:
         raise HTTPException(404, f"No existe el pedido #{order_id}.")
-    if not order.pay_key or not secrets.compare_digest(clave.encode(), order.pay_key.encode()):
+    if not order.clave_valida(clave):
         raise HTTPException(403, "Este pedido solo se puede pagar desde su página de confirmación.")
     if order.paid_txn == idTxn:
         return {"ok": True, "pedido": order_id, "idTxn": idTxn}  # reintento del mismo pago
@@ -173,10 +178,13 @@ def pay_order(order_id: int, idTxn: str = Body(..., min_length=1, max_length=64)
         raise HTTPException(404, f"No existe la transacción '{idTxn}'.")
     if txn.get("estado") != STATUS_VALID:
         raise HTTPException(409, f"La transacción quedó {txn.get('estado')}: no cuenta como pago.")
-    if txn.get("valor") != order.total:
-        raise HTTPException(409, f"Se pagaron {txn.get('valor')} y el pedido #{order_id} vale {order.total:g}.")
+    factura = facturacion.factura_de(order_id)
+    a_pagar = factura["total"] if factura else order.total  # con descuento, se paga el total de la factura
+    if txn.get("valor") != a_pagar:
+        raise HTTPException(409, f"Se pagaron {txn.get('valor')} y el pedido #{order_id} vale {a_pagar:g}.")
     if not storage.mark_order_paid(order_id, idTxn):
         raise HTTPException(409, "El pedido ya estaba pagado o esa transacción ya pagó otro pedido.")
+    facturacion.registrar_pago(order_id, idTxn, txn.get("metodo_pago"), a_pagar)
     return {"ok": True, "pedido": order_id, "idTxn": idTxn}
 
 
@@ -234,9 +242,20 @@ def _confirmacion(request: Request, result: runtime.OrderResult):
             "request": request,
             "order": result.order,
             "warnings": result.warnings,
+            "factura": result.factura or facturacion.factura_de(result.order.order_id),
             "top_products": ranking.most_ordered(5),
         },
     )
+
+
+@router.get("/pedidos/{order_id}")
+async def order_page(request: Request, order_id: int, clave: str = ""):
+    """La confirmación otra vez (después de pagar, para ver la factura y adjuntar el comprobante): solo con la clave
+    del pedido, la misma que lleva el enlace de pago."""
+    order = storage.get_order(order_id)
+    if order is None or not order.clave_valida(clave):
+        raise HTTPException(404, f"No encontramos el pedido #{order_id}.")  # 404 también sin clave: no confirma que existe
+    return _confirmacion(request, runtime.OrderResult(order=order, warnings=[]))
 
 
 @router.post("/pedidos")
@@ -258,7 +277,16 @@ async def create_order(
         context["error"] = mensaje
         return templates.TemplateResponse("index.html", context, status_code=400)
 
-    client, served_by = client.strip(), served_by.strip()
+    # Limpieza en la frontera: "ana  LÓPEZ" y "Ana López" quedan como el mismo cliente.
+    client, served_by = nombre_propio(client), normalizar_texto(served_by)
+    try:
+        descuento = float(str(form.get("descuento") or "0").replace(",", "."))
+    except ValueError:
+        return rechazar("El descuento debe ser un número.")
+    if descuento:
+        # Un descuento lo da el cajero desde el equipo del local, no cualquiera que abra la URL pública.
+        if not gestos_api.token_valido(request, form.get("token_equipo")):
+            return rechazar("Los descuentos solo se aplican desde la caja del local.")
     if channel not in (CHANNEL_LOCAL, CHANNEL_DOMICILIO):
         return rechazar("Elige si el pedido es para el local o a domicilio.")
     if len(client) > MAX_NOMBRE or len(served_by) > MAX_NOMBRE:
@@ -292,8 +320,9 @@ async def create_order(
             served_by=served_by or None,
             para_llevar=form.get("para_llevar") == "1",
             notas=", ".join(n for n in NOTAS_COCINA if n in form.getlist("nota")) or None,
+            descuento_pct=descuento,
         )
-    except (CoverageError, StockError) as exc:
+    except (CoverageError, StockError, facturacion.FacturaError) as exc:
         return rechazar(str(exc))
 
     if token:
@@ -339,8 +368,7 @@ async def kitchen(request: Request):
 def _exigir_equipo(request: Request, token: str) -> None:
     """Cocina cambia pedidos: solo con el token que la página entrega a quien la abre en el equipo del local
     (o con APPRESSO_ENTRENAMIENTO=1). Así tampoco sirve un formulario armado desde otro sitio."""
-    esperado = gestos_api.token_para(request)
-    if not esperado or not secrets.compare_digest(token.encode(), esperado.encode()):
+    if not gestos_api.token_valido(request, token):
         raise HTTPException(403, "Cocina solo se opera desde el equipo del local.")
 
 
@@ -388,7 +416,7 @@ async def dashboard(request: Request):
 
 @router.get("/clientes/{client}")
 async def client_history(request: Request, client: str):
-    history = storage.get_client_history(client)
+    history = storage.get_client_history(nombre_propio(client)) or storage.get_client_history(client)
     weekly_quantities = [order.total_quantity for order in history]
     difference = infer_weekly_increase(weekly_quantities)  # 0 con menos de dos pedidos: todavía no hay tendencia
     progression = arithmetic_progression(weekly_quantities[0], difference, terms=5) if len(weekly_quantities) >= 2 else []
@@ -440,9 +468,139 @@ def _medir_laboratorio(size: int) -> List[dict]:
     return filas
 
 
+LIMITE_CUADRATICO = 1000  # los O(n²) se miden hasta aquí; más arriba se estiman (con 25.000 tardarían minutos)
+
+
+def _pedidos_desordenados(size: int):
+    """Pedidos de prueba con fechas al azar en 90 días y nombres de cliente escritos de varias formas,
+    para que ordenar por fecha, contar por cliente y buscar duplicados tengan trabajo de verdad."""
+    import random
+    from datetime import timedelta
+
+    rng = random.Random(7)
+    orders = generate_demo_orders(size, storage.get_products(), storage.get_neighborhood_names())
+    inicio = datetime(2026, 8, 1)
+    variantes = (lambda c: c, lambda c: c.lower(), lambda c: c.upper(), lambda c: f"  {c} ")
+    for order in orders:
+        order.created_at = (inicio + timedelta(seconds=rng.randrange(90 * 24 * 3600))).isoformat(timespec="seconds")
+        order.client = rng.choice(variantes)(order.client)
+    return orders
+
+
+def _medir(funcion, *args):
+    contador = OperationCounter()
+    inicio = time.perf_counter()
+    resultado = funcion(*args, contador)
+    return {"ops": contador.comparisons + contador.additions, "ms": (time.perf_counter() - inicio) * 1000, "resultado": resultado}
+
+
+def _comparar_algoritmos(size: int) -> List[dict]:
+    """Una fila por n con las versiones ingenuas (O(n²)) y optimizadas (O(n), O(n log n)) de cada problema."""
+    if size not in LAB_SIZES:
+        raise HTTPException(400, f"El tamaño debe ser uno de {LAB_SIZES}.")
+    orders = _pedidos_desordenados(size)
+    filas, base = [], {}
+    for n in (s for s in LAB_SIZES if s <= size):
+        muestra = orders[:n]
+        nombres = [o.client for o in muestra]
+        fila = {"n": n, "estimado": n > LIMITE_CUADRATICO}
+        rapidos = {
+            "conteo_rapido": _medir(count_orders_per_client, muestra),
+            "merge": _medir(merge_sort_by_date, muestra),
+            "dup_rapido": _medir(duplicados, nombres),
+            "ranking": _medir(top_items, muestra),
+        }
+        inicio = time.perf_counter()
+        sorted(muestra, key=lambda o: o.created_at)
+        rapidos["timsort"] = {"ops": None, "ms": (time.perf_counter() - inicio) * 1000}
+        inicio = time.perf_counter()
+        [nombre_propio(c) for c in nombres]
+        rapidos["normalizar"] = {"ops": n, "ms": (time.perf_counter() - inicio) * 1000}
+        if not fila["estimado"]:
+            lentos = {
+                "conteo_ingenuo": _medir(count_orders_per_client_naive, muestra),
+                "insercion": _medir(insertion_sort_by_total, muestra),
+                "dup_ingenuo": _medir(duplicados_ingenuo, nombres),
+            }
+            base = {"n": n, **lentos}
+        else:  # O(n²): al multiplicar n por k, el trabajo se multiplica por k²
+            factor = (n / base["n"]) ** 2
+            lentos = {k: {"ops": round(v["ops"] * factor), "ms": v["ms"] * factor} for k, v in base.items() if k != "n"}
+        for clave_alg, medida in {**rapidos, **lentos}.items():
+            fila[clave_alg] = {"ops": medida["ops"], "ms": medida["ms"]}
+        fila["mejora_conteo"] = lentos["conteo_ingenuo"]["ms"] / max(rapidos["conteo_rapido"]["ms"], 1e-3)
+        fila["mejora_orden"] = lentos["insercion"]["ms"] / max(rapidos["merge"]["ms"], 1e-3)
+        fila["mejora_dup"] = lentos["dup_ingenuo"]["ms"] / max(rapidos["dup_rapido"]["ms"], 1e-3)
+        fila["top"] = rapidos["ranking"]["resultado"][:3]
+        fila["clientes_distintos"] = len(set(nombres))
+        fila["clientes_reales"] = len({c.strip().lower() for c in nombres})
+        filas.append(fila)
+    return filas
+
+
 @router.post("/laboratorio")
 async def lab_run(request: Request, size: int = Form(100)):
-    return templates.TemplateResponse("laboratorio.html", {"request": request, "result": {"size": size, "filas": _medir_laboratorio(size)}})
+    return templates.TemplateResponse("laboratorio.html", {
+        "request": request, "limite": LIMITE_CUADRATICO,
+        "result": {"size": size, "filas": _medir_laboratorio(size), "comparacion": _comparar_algoritmos(size)},
+    })
+
+
+_benchmark_panel: dict = {}  # la comparación con n = 1000 tarda ~1 s: se calcula una vez por arranque
+
+
+@router.get("/panel")
+async def panel_page(request: Request):
+    """Todo en un lugar: ventas, patrones, empleados, calidad de datos, integridad y benchmark."""
+    if not _benchmark_panel:
+        _benchmark_panel.update(next(f for f in _comparar_algoritmos(1000) if f["n"] == 1000))
+    pedidos, facturas = storage.get_all_orders(), storage.get_invoices()
+    return templates.TemplateResponse("panel.html", {
+        "request": request,
+        "patrones": analitica.patrones(pedidos, facturas),
+        "empleados": analitica.empleados(facturas),
+        "calidad": reporte_calidad(storage.get_products(), pedidos, storage.get_ingredients()),
+        "integridad": facturacion.integridad(),
+        "benchmark": _benchmark_panel,
+        "top_products": ranking.most_ordered(5),
+    })
+
+
+@router.get("/facturas")
+async def invoices_page(request: Request):
+    return templates.TemplateResponse("facturas.html", {
+        "request": request,
+        "facturas": list(reversed(facturacion.con_estado(storage.get_invoices()))),
+        "pagos": list(reversed(storage.get_payments())),
+        "integridad": facturacion.integridad(),
+        "token": gestos_api.token_para(request) or "",
+    })
+
+
+@router.get("/ia")
+async def ai_page(request: Request):
+    """Clasificador de operaciones (TensorFlow.js) y anomalías y demanda (Simple Statistics), entrenados en el navegador."""
+    return templates.TemplateResponse("ia.html", {"request": request})
+
+
+@router.get("/administracion")
+async def admin_page(request: Request):
+    return templates.TemplateResponse("administracion.html", {"request": request})
+
+
+@router.get("/laboratorio/comparacion.csv")
+async def lab_comparison_csv(size: int = 1000):
+    """Las mediciones de la comparación, para el informe (las filas con n > 1000 traen los O(n²) estimados)."""
+    claves = ("conteo_ingenuo", "conteo_rapido", "insercion", "merge", "timsort", "dup_ingenuo", "dup_rapido", "ranking", "normalizar")
+    lineas = ["n,estimado," + ",".join(f"{k}_ops,{k}_ms" for k in claves)]
+    for f in _comparar_algoritmos(size):
+        valores = []
+        for k in claves:
+            ops = f[k]["ops"]
+            valores += ["" if ops is None else str(ops), f"{f[k]['ms']:.3f}"]
+        lineas.append(f"{f['n']},{'si' if f['estimado'] else 'no'}," + ",".join(valores))
+    return Response("\n".join(lineas) + "\n", media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="comparacion_algoritmos.csv"'})
 
 
 @router.get("/laboratorio/operation_counts.csv")

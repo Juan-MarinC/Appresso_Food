@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700;800&display=swap">
-  <link rel="stylesheet" href="/static/css/app.css?v=3">
+  <link rel="stylesheet" href="/static/css/app.css?v=4">
   <link rel="stylesheet" href="/static/css/estilo2.css">
   <link rel="stylesheet" href="/static/css/estilo3.css">
   {% block estilos %}{% endblock %}
@@ -20,9 +20,13 @@
   ] %}
   {# Páginas internas (personal y parte técnica): van plegadas para no saturar a quien compra. #}
   {% set equipo = [
+    ('panel', '/panel', 'Panel'),
+    ('ia', '/ia', 'IA'),
     ('turnos', '/turnos', 'Turnos'),
     ('cocina', '/cocina', 'Cocina'),
     ('dashboard', '/dashboard', 'Dashboard'),
+    ('facturas', '/facturas', 'Facturas'),
+    ('administracion', '/administracion', 'Administración'),
     ('transacciones', '/transacciones', 'Transacciones'),
     ('antifraude', '/antifraude', 'Antifraude'),
     ('laboratorio', '/laboratorio', 'Laboratorio'),

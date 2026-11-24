@@ -7,7 +7,7 @@ aplicación, para que el negocio (SQLite) siga siendo la fuente de verdad.
 from dataclasses import dataclass
 from typing import List, Optional
 
-from appresso_food.nucleo import storage
+from appresso_food.nucleo import facturacion, storage
 from appresso_food.nucleo.dispatch import DispatchEntry, DispatchHeap
 from appresso_food.nucleo.graph import RESTAURANT_NODE, DeliveryGraph, build_graph
 from appresso_food.nucleo.models import (
@@ -30,6 +30,7 @@ undo_stack = UndoStack()
 class OrderResult:
     order: Order
     warnings: List[str]
+    factura: Optional[dict] = None
 
 
 class CoverageError(Exception):
@@ -59,7 +60,8 @@ def init_runtime() -> None:
 
 
 def place_order(client: str, channel: str, neighborhood: Optional[str], items: List[OrderItem], served_by: Optional[str],
-                para_llevar: bool = False, notas: Optional[str] = None) -> OrderResult:
+                para_llevar: bool = False, notas: Optional[str] = None, descuento_pct: float = 0) -> OrderResult:
+    facturacion.calcular(items, descuento_pct)  # valida el descuento antes de crear nada (FacturaError)
     route = None
     distance_km = None
     eta_minutes = None
@@ -92,6 +94,7 @@ def place_order(client: str, channel: str, neighborhood: Optional[str], items: L
         notas=notas,
     )
     order.order_id = storage.create_order(order)
+    factura = facturacion.emitir_factura(order.order_id, items, descuento_pct, served_by)
 
     warnings = storage.deduct_ingredients_for_items(items)
 
@@ -101,7 +104,7 @@ def place_order(client: str, channel: str, neighborhood: Optional[str], items: L
 
     undo_stack.push(UndoAction(kind="crear_pedido", order_id=order.order_id, payload=order))
 
-    return OrderResult(order=order, warnings=warnings)
+    return OrderResult(order=order, warnings=warnings, factura=factura)
 
 
 def advance_pending() -> Optional[Order]:
@@ -138,6 +141,9 @@ def undo_last() -> Optional[str]:
         if actual and actual.paid_txn:  # el pago no se borra: su transacción no debe poder pagar otro pedido
             return f"El pedido #{order.order_id} ya está pagado: no se puede deshacer."
         storage.restore_ingredients_for_items(order.items)
+        factura = facturacion.factura_de(order.order_id)
+        if factura:  # la factura no se borra: se anula con una nota crédito, que queda en la cadena
+            facturacion.anular_factura(factura["number"], "Pedido deshecho en cocina")
         storage.delete_order(order.order_id)
         pending_queue.remove(order.order_id)
         dispatch_heap.remove(order.order_id)
