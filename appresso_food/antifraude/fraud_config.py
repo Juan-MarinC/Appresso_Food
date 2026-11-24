@@ -72,7 +72,8 @@ class FraudConfig:
         cfg.band_rules_enabled = os.getenv("APPRESSO_BAND_RULES_ENABLED", "true").lower() != "false"
         cfg.hash_helper_enabled = os.getenv("APPRESSO_HASH_HELPER", "true").lower() != "false"
         cfg.lenient_inputs = os.getenv("APPRESSO_LENIENT_INPUTS", "true").lower() != "false"
-        cfg.rejected_as_201 = os.getenv("APPRESSO_REJECTED_AS_201", "true").lower() != "false"
+        # Apagado por defecto: una rechazada responde su código real (400, 409, 422), no 201 como si estuviera bien.
+        cfg.rejected_as_201 = os.getenv("APPRESSO_REJECTED_AS_201", "false").lower() == "true"
         raw_rules = os.getenv("APPRESSO_BAND_RULES")
         if raw_rules:
             cfg.band_rules = [tuple(rule) for rule in json.loads(raw_rules)]

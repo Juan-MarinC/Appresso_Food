@@ -452,7 +452,8 @@ class FraudService:
             "anomalias": [{k: v for k, v in a.items() if k not in ("transacciones_ventana", "fecha_creacion", "fecha_actualizacion", "fecha_txn", "usuario_id", "transaccion_id")} for a in anomalies],
             "errores": [],
         }
-        return Outcome(201, body)
+        # 201: entró limpia. 202: entró y quedó guardada, pero marcada como posible fraude (en revisión).
+        return Outcome(202 if estado == STATUS_SUSPICIOUS else 201, body)
 
     # ------------------------------------------------------------------ helpers
     def _check_client_hash(self, raw: dict, norm: NormalizedTransaction) -> dict:

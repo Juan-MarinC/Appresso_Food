@@ -21,6 +21,8 @@ router = APIRouter()
 ROLES = ("admin", "cajero", "cocina", "repartidor", "cliente")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[a-z]{2,}$", re.I)
 USUARIOS_SEMBRADOS = {email for _, email, _ in seed_data.USERS}
+# Renombrar una categoría arrastra a sus productos: las del menú solo se editan o borran desde el equipo del local.
+CATEGORIAS_MENU = {clave(categoria) for _, categoria, _ in seed_data.PRODUCTS}
 
 
 # --- Calidad e integridad ----------------------------------------------------------------------
@@ -90,9 +92,18 @@ async def create_category(request: Request):
     return {"ok": True, "mensaje": f"Categoría creada con id {nuevo}.", "categoria": _categoria_publica(_buscar_categoria(nuevo))}
 
 
+def _categoria_protegida(fila, request: Request):
+    if clave(fila[1]) in CATEGORIAS_MENU and not gestos_api._directo_y_local(request):
+        return error_response(403, "CATEGORIA_PROTEGIDA", f"'{fila[1]}' es una categoría del menú del local y no se modifica por la API pública. Cree su propia categoría con POST /api/categorias.")
+    return None
+
+
 @router.put("/api/categorias/{categoria_id}", openapi_extra=json_body({"nombre": "Postres", "descripcion": "Dulces"}))
 async def update_category(categoria_id: int, request: Request):
     actual = _buscar_categoria(categoria_id)
+    bloqueo = _categoria_protegida(actual, request)
+    if bloqueo:
+        return bloqueo
     datos, error = await _leer_categoria(request)
     if error:
         return error
@@ -105,8 +116,11 @@ async def update_category(categoria_id: int, request: Request):
 
 
 @router.delete("/api/categorias/{categoria_id}")
-def delete_category(categoria_id: int):
+def delete_category(categoria_id: int, request: Request):
     actual = _buscar_categoria(categoria_id)
+    bloqueo = _categoria_protegida(actual, request)
+    if bloqueo:
+        return bloqueo
     if actual[3]:
         return error_response(409, "CATEGORIA_EN_USO", f"'{actual[1]}' la usan {actual[3]} producto(s): cámbieles la categoría antes de borrarla.")
     storage.delete_category(categoria_id)
@@ -115,8 +129,13 @@ def delete_category(categoria_id: int):
 
 # --- Usuarios con roles ------------------------------------------------------------------------
 
-def _usuario_publico(fila) -> dict:
-    return {"id": fila[0], "nombre": fila[1], "email": fila[2], "rol": fila[3], "activo": bool(fila[4]), "creado": fila[5]}
+def _usuario_publico(fila, request: Request) -> dict:
+    """Por la URL pública el correo va enmascarado (an***@correo.com): es un dato personal."""
+    email = fila[2]
+    if not gestos_api._directo_y_local(request):
+        usuario, _, dominio = email.partition("@")
+        email = f"{usuario[:2]}***@{dominio}"
+    return {"id": fila[0], "nombre": fila[1], "email": email, "rol": fila[3], "activo": bool(fila[4]), "creado": fila[5]}
 
 
 def _buscar_usuario(usuario_id: int):
@@ -174,14 +193,14 @@ EJEMPLO_USUARIO = {"nombre": "Ana López", "email": "ana@correo.com", "rol": "ca
 
 
 @router.get("/api/usuarios")
-def list_users(rol: Optional[str] = None):
-    usuarios = [_usuario_publico(u) for u in storage.get_users()]
+def list_users(request: Request, rol: Optional[str] = None):
+    usuarios = [_usuario_publico(u, request) for u in storage.get_users()]
     return [u for u in usuarios if not rol or u["rol"] == rol]
 
 
 @router.get("/api/usuarios/{usuario_id}")
-def get_user(usuario_id: int):
-    return _usuario_publico(_buscar_usuario(usuario_id))
+def get_user(usuario_id: int, request: Request):
+    return _usuario_publico(_buscar_usuario(usuario_id), request)
 
 
 @router.post("/api/usuarios", status_code=201, openapi_extra=json_body(EJEMPLO_USUARIO))
@@ -195,7 +214,7 @@ async def create_user(request: Request):
     nuevo, error = _guardar_usuario(None, datos)
     if error:
         return error
-    return {"ok": True, "mensaje": f"Usuario creado con id {nuevo}.", "usuario": _usuario_publico(_buscar_usuario(nuevo))}
+    return {"ok": True, "mensaje": f"Usuario creado con id {nuevo}.", "usuario": _usuario_publico(_buscar_usuario(nuevo), request)}
 
 
 async def _modificar_usuario(usuario_id: int, request: Request, parcial: bool):
@@ -213,7 +232,7 @@ async def _modificar_usuario(usuario_id: int, request: Request, parcial: bool):
     _, error = _guardar_usuario(usuario_id, datos)
     if error:
         return error
-    return {"ok": True, "mensaje": f"Usuario {usuario_id} actualizado.", "usuario": _usuario_publico(_buscar_usuario(usuario_id))}
+    return {"ok": True, "mensaje": f"Usuario {usuario_id} actualizado.", "usuario": _usuario_publico(_buscar_usuario(usuario_id), request)}
 
 
 @router.put("/api/usuarios/{usuario_id}", openapi_extra=json_body(EJEMPLO_USUARIO))

@@ -433,7 +433,7 @@ Cómo ejecutarlo: ver "Cómo ejecutar la app" más arriba (necesita MongoDB).
 | `APPRESSO_PAYMENT_METHODS` | `Tarjeta,Efectivo,Nequi,Daviplata,PSE,Transferencia` | Métodos válidos |
 | `APPRESSO_HASH_HELPER` | `true` | Habilita `POST /api/transactions/hash` (firma desde el formulario) |
 | `APPRESSO_LENIENT_INPUTS` | `true` | Modo generador externo: `user` como correo o id simple, método de pago libre, hash SHA-256 sin llave |
-| `APPRESSO_REJECTED_AS_201` | `true` | Una petición recibida que queda RECHAZADA (o cuerpo roto) responde 201 con el resultado en el cuerpo y se guarda en la cuarentena; `false` devuelve 422 / 400 |
+| `APPRESSO_REJECTED_AS_201` | `false` | Con `true`, una petición que queda RECHAZADA (o cuerpo roto) responde 201 con el resultado en el cuerpo, para generadores que toman cualquier 4xx como fallo. Por defecto responde su código real (422 / 400) |
 
 ### Flujo de `POST /api/transactions`
 
@@ -453,7 +453,7 @@ Cuerpo (los nombres de campo son los del PDF; `nombre`, `cedula` y `hash` son op
 El formulario web sí exige `nombre` y `cedula`; por API, si llegan se validan igual que el resto y si no
 llegan no pasa nada. Si faltan campos obligatorios, la respuesta incluye `formato_esperado` con un ejemplo.
 
-Respuestas: `201` válida o sospechosa, `422` rechazada, `409` ID duplicado,
+Respuestas: `201` válida, `202` sospechosa (entró y quedó guardada, pero marcada como posible fraude), `422` rechazada, `409` ID duplicado,
 `400` JSON mal formado, `503` sin MongoDB.
 
 ### Ventana deslizante

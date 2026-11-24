@@ -154,5 +154,43 @@ class CompatMiddlewareTests(unittest.TestCase):
             self.assertEqual(compat.cors_origins(), ["*"])
 
 
+class CodigosHttpTest(unittest.TestCase):
+    """Lo que mandaba el bot del profesor: cada resultado debe responder su propio código, no 201 para todo."""
+
+    def _post(self, svc, cuerpo):
+        from fastapi.testclient import TestClient
+        app = FastAPI()
+        app.include_router(fraud_routes.router)
+        datos = cuerpo if isinstance(cuerpo, (bytes, str)) else json.dumps(cuerpo)
+        with mock.patch.object(fraud_routes, "get_service", return_value=svc):
+            r = TestClient(app).post("/api/transactions", content=datos, headers={"Content-Type": "application/json"})
+        return r.status_code, r.json()
+
+    def test_cada_resultado_con_su_codigo(self):
+        svc = service()
+        self.assertEqual(self._post(svc, txn(1))[0], 201)  # válida
+        codigo, cuerpo = self._post(svc, txn(2, user=None))  # correo nulo
+        self.assertEqual((codigo, cuerpo["estado"]), (422, "REJECTED"))
+        self.assertEqual(self._post(svc, txn(3, value=0))[0], 422)  # valor 0
+        rafaga = [self._post(svc, txn(10 + i, user="bot@correo.com", date=f"2026-10-04T10:00:0{i}.000")) for i in range(3)]
+        self.assertEqual([c for c, _ in rafaga], [201, 201, 202])  # la 3ª en 10 s: entra, pero como posible fraude
+        self.assertEqual(rafaga[2][1]["estado"], "SUSPICIOUS")
+        self.assertEqual(self._post(svc, txn(1))[0], 409)  # id repetido
+        self.assertEqual(self._post(svc, b"{roto")[0], 400)  # no es JSON
+        codigo, cuerpo = self._post(svc, {"update_id": 1, "message": {"text": "/pagar 25000"}})
+        self.assertEqual((codigo, cuerpo["estado"]), (200, "REJECTED"))  # Telegram reintenta los 4xx: se responde 200
+
+    def test_el_modo_201_para_rechazadas_sigue_disponible_si_se_pide(self):
+        svc = service()
+        svc.config.rejected_as_201 = True  # APPRESSO_REJECTED_AS_201=true
+        codigo, cuerpo = self._post(svc, txn(2, user=None))
+        self.assertEqual((codigo, cuerpo["estado"], cuerpo["http_original"]), (201, "REJECTED", 422))
+
+    def test_por_defecto_las_rechazadas_no_responden_201(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("APPRESSO_REJECTED_AS_201", None)
+            self.assertFalse(FraudConfig.from_env().rejected_as_201)
+
+
 if __name__ == "__main__":
     unittest.main()

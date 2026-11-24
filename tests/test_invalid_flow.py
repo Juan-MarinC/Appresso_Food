@@ -107,9 +107,10 @@ class InvalidFlowTests(unittest.TestCase):
         for i, encoding in enumerate(("utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "utf-32"), start=200):
             with self.subTest(encoding=encoding):
                 out = self.send(json.dumps(valid(i)).encode(encoding))
-                self.assertEqual(out.http_status, 201)
+                # Aceptada, no rechazada: desde la 3ª del mismo usuario la ventana la marca sospechosa (202).
+                self.assertIn(out.http_status, (201, 202))
         out = self.send(str(valid(300)).encode())  # literal de Python con comillas simples
-        self.assertEqual(out.http_status, 201)
+        self.assertIn(out.http_status, (201, 202))
         out = self.send("\n".join(json.dumps(valid(i)) for i in (301, 302)).encode())  # una transacción por línea
         self.assertEqual((out.http_status, out.body["aceptadas"]), (201, 2))
         self.assertEqual(self.repo.invalid, [])

@@ -125,7 +125,10 @@ class UsuariosYCategoriasTest(_ConApi):
         r = self.api.post("/api/usuarios", json={"nombre": "  ana  LÓPEZ ", "email": "ANA@Correo.com", "rol": "cajero"})
         self.assertEqual(r.status_code, 201)
         usuario = r.json()["usuario"]
-        self.assertEqual((usuario["nombre"], usuario["email"]), ("Ana López", "ana@correo.com"))  # limpio
+        self.assertEqual(usuario["nombre"], "Ana López")  # limpio
+        self.assertEqual(usuario["email"], "an***@correo.com")  # por la URL pública el correo va enmascarado
+        self.assertEqual(storage.get_user(usuario["id"])[2], "ana@correo.com")  # guardado completo y en minúsculas
+        self.assertNotIn("laura.admin@", str(self.api.get("/api/usuarios").json()))
         self.assertEqual(self.api.post("/api/usuarios", json={"nombre": "Otra", "email": "ana@correo.com", "rol": "cocina"}).status_code, 409)
         self.assertEqual(self.api.post("/api/usuarios", json={"nombre": "X", "email": "malo", "rol": "jefe"}).status_code, 422)
         self.assertEqual(self.api.patch(f"/api/usuarios/{usuario['id']}", json={"rol": "cocina"}).json()["usuario"]["rol"], "cocina")
@@ -139,12 +142,18 @@ class UsuariosYCategoriasTest(_ConApi):
         self.assertEqual(r.status_code, 201)
         self.assertEqual(self.api.post("/api/categorias", json={"nombre": " postrés "}).status_code, 409)
         bebidas = next(c for c in self.api.get("/api/categorias").json() if c["nombre"] == "Bebidas")
-        self.assertEqual(self.api.delete(f"/api/categorias/{bebidas['id']}").status_code, 409)  # la usan productos
+        self.assertEqual(self.api.delete(f"/api/categorias/{bebidas['id']}").status_code, 403)  # es del menú
         producto = self.api.post("/api/productos", json={"nombre": "Limonada", "precio": 6000, "categoria": "  bebidas "}).json()
         self.assertEqual(producto["producto"]["categoria"], "Bebidas")  # se usó la existente
         self.assertEqual(self.api.post("/api/productos", json={"nombre": "limonáda", "precio": 1}).status_code, 409)  # duplicado
-        self.api.put(f"/api/categorias/{bebidas['id']}", json={"nombre": "Bebidas frías"})
-        self.assertEqual(storage.get_product(producto["producto"]["id"]).category, "Bebidas frías")
+        r = self.api.put(f"/api/categorias/{bebidas['id']}", json={"nombre": "Lo que sea"})
+        self.assertEqual((r.status_code, r.json()["motivo"]), (403, "CATEGORIA_PROTEGIDA"))  # la del menú no se renombra
+        postres = self.api.get("/api/categorias").json()
+        postres = next(c for c in postres if c["nombre"] == "Postres")
+        propio = self.api.post("/api/productos", json={"nombre": "Flan", "precio": 7000, "categoria": "postres"}).json()
+        self.api.put(f"/api/categorias/{postres['id']}", json={"nombre": "Postres fríos"})
+        self.assertEqual(storage.get_product(propio["producto"]["id"]).category, "Postres fríos")  # el producto la sigue
+        self.assertEqual(self.api.delete(f"/api/categorias/{postres['id']}").status_code, 409)  # la usa el flan
 
 
 class LimpiezaTest(unittest.TestCase):

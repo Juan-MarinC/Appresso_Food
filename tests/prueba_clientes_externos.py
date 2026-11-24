@@ -181,7 +181,7 @@ def main():
     with ThreadPoolExecutor(max_workers=10) as pool:
         results = list(pool.map(lambda _: jpost(txn(user=one)), range(10)))
     states = [estado(r[1]) for r in results]
-    check("10 en paralelo del mismo usuario: se detecta la ráfaga", states.count("SUSPICIOUS") >= 7 and all(r[0] == 201 for r in results), states)
+    check("10 en paralelo del mismo usuario: se detecta la ráfaga", states.count("SUSPICIOUS") >= 7 and all(r[0] == (202 if estado(r[1]) == "SUSPICIOUS" else 201) for r in results), states)
     s, d, _, secs = jpost([txn() for _ in range(50)])
     check(f"lote de 50 en una sola petición ({secs} s)", s == 201 and (d or {}).get("total") == 50 and secs < 30, (s, secs))
     s, d, _, secs = jpost([txn() for _ in range(1500)])

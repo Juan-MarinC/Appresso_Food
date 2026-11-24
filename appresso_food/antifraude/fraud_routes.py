@@ -134,14 +134,26 @@ def antifraud_page(request: Request):
 
 
 # ---------------------------------------------------------------- API
-def _http_status(service: FraudService, outcome) -> int:
-    """Una transacción bien formada que se recibió y quedó registrada como RECHAZADA (reglas o hash) responde 201 con
-    el resultado en el cuerpo, como CAPRICHO: un generador externo no la toma como fallo de conexión ni la reintenta.
-    Incluye el cuerpo vacío o que no es JSON (400): se guarda en la cuarentena. Sigue siendo error HTTP solo el ID repetido (409). APPRESSO_REJECTED_AS_201=false lo desactiva."""
+def _es_update_telegram(body: bytes) -> bool:
+    try:
+        datos = json.loads(body)
+    except ValueError:
+        return False
+    return isinstance(datos, dict) and "update_id" in datos
+
+
+def _http_status(service: FraudService, outcome, body: bytes = b"") -> int:
+    """Por defecto cada resultado responde su código real: 201 válida, 202 sospechosa, 400 cuerpo vacío o que no es
+    JSON, 422 datos inválidos o hash alterado, 409 ID repetido. Con APPRESSO_REJECTED_AS_201=true las rechazadas
+    (400/422) responden 201 con el resultado en el cuerpo, para generadores que toman cualquier 4xx como fallo."""
     if service.config.rejected_as_201 and outcome.http_status in (400, 422) and outcome.body.get("estado") == "REJECTED":
         outcome.body["http_original"] = outcome.http_status
         outcome.body["clasificacion"] = "ERRONEA"
         return 201
+    if outcome.http_status in (400, 422) and _es_update_telegram(body):
+        # Un webhook de Telegram reintenta todo lo que no sea 2xx: el Update no es una transacción, se explica y listo.
+        outcome.body["nota"] = "Update de Telegram recibido: no es una transacción, se responde 200 para que Telegram no lo reintente."
+        return 200
     return outcome.http_status
 
 
@@ -159,7 +171,7 @@ async def post_transaction(request: Request):
             "user_agent": request.headers.get("user-agent"), "metodo": request.method, "ruta": request.url.path,
             "query": dict(request.query_params)}  # se usa solo si el cuerpo llega vacío (requests.post(url, params=...))
     outcome = await run_in_threadpool(service.process_body, body, meta)
-    return JSONResponse(outcome.body, status_code=_http_status(service, outcome))
+    return JSONResponse(outcome.body, status_code=_http_status(service, outcome, body))
 
 
 # --- cuarentena: requests que no cumplieron el contrato (se conservan para revisarlos o reprocesarlos)

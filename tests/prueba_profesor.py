@@ -58,7 +58,9 @@ def check(name, result, status, motivo=None, needs_message=True):
 
 
 def accepted(name, result, status=201):
-    """201 y además aceptada (VALID o SUSPICIOUS): con rejected_as_201 una errónea también responde 201."""
+    """Aceptada (VALID o SUSPICIOUS): 201 si quedó válida, 202 si entró marcada como posible fraude."""
+    if isinstance(result[1], dict) and result[1].get("estado") == "SUSPICIOUS":
+        status = 202
     body = check(name, result, status)
     good = isinstance(body, dict) and body.get("estado") in ("VALID", "SUSPICIOUS")
     if not good:
@@ -107,7 +109,7 @@ def main():
         t = tx(2, nombre="Profe Prueba", cedula="1012345678", value="50000", paymentMethod="tarjeta")
         check("con nombre/cédula, valor texto y método en minúscula", call("POST", "/api/transactions", dict(t, hash=sign(t))), 201)
         t = tx(3)
-        check("sin hash: el servidor lo genera", call("POST", "/api/transactions", t), 201)
+        accepted("sin hash: el servidor lo genera", call("POST", "/api/transactions", t))  # 3ª del usuario: puede dar 202
         t = tx(4)
         body = check("datos alterados -> HASH_MISMATCH (REJECTED)", call("POST", "/api/transactions", dict(t, value=1, hash=sign(t))), REJ, "HASH_MISMATCH")
         check("   y explica la causa", (200 if body.get("diagnostico_hash") else 0, {"ok": True}, None), 200)
