@@ -65,7 +65,7 @@ Se probó cada punto contra el servidor corriendo (`python tests/prueba_profesor
 | Aceptar o rechazar según coincida el hash (y decir por qué) | ✅ | `POST /api/transactions`, y `hash` opcional en POST/PUT/PATCH de productos |
 | "Un hash por sí solo no autentica al remitente" | ✅ documentado | sección *Hash*; el hash prueba integridad, no identidad |
 | Descomposición: validar cada producto, saltar los inválidos, sumar el total (`Mouse "50000" x "2"` + `Teclado`) | ✅ | `POST /api/totales` |
-| Divide y vencerás / recursividad (dividir, resolver, combinar) | ✅ ya existía | `algorithms.recursive_total_units`, laboratorio `/laboratorio` |
+| Divide y vencerás / recursividad (dividir, resolver, combinar) | ✅ ya existía | `algorithms.recursive_total_sales`, laboratorio `/laboratorio` |
 
 **Qué faltaba y se agregó:** los métodos PUT/PATCH/DELETE (la app solo tenía POST y GET), un hash que
 se pueda calcular con el código de la clase (antes el servidor firmaba con otra llave y exigía

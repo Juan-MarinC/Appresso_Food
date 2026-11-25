@@ -63,8 +63,8 @@ Una tercera relación (`product_ingredients`, producto↔ingrediente) sostiene
 el descuento de inventario.
 
 ### 4.5 Complejidad computacional y Big O
-`find_order_linear` (O(n)), `total_units_sold` (O(n)) y
-`recursive_total_units` (trabajo O(n), profundidad O(log n) por divide y
+`find_order_linear` (O(n)), `total_sales` (O(n)) y
+`recursive_total_sales` (trabajo O(n), profundidad O(log n) por divide y
 vencerás) se instrumentan con `OperationCounter` para contar comparaciones,
 sumas y llamadas. El laboratorio de complejidad (`/laboratorio`) permite
 ejecutar estos algoritmos con 10, 100, 1.000, 10.000 y 25.000 pedidos

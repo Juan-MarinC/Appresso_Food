@@ -23,9 +23,9 @@ from appresso_food.nucleo import seed_data, storage
 from appresso_food.api.gestos_api import _directo_y_local
 from appresso_food.api.api_helpers import error_response, json_body, read_json_object, verify_hash
 from appresso_food.antifraude.fraud_config import FraudConfig
-from appresso_food.antifraude.fraud_validation import EMPTY_FIELD, INVALID_NAME, INVALID_TYPE, NULL_FIELD, FieldError, parse_value
+from appresso_food.antifraude.fraud_validation import EMPTY_FIELD, INVALID_NAME, INVALID_TYPE, INVALID_VALUE, NULL_FIELD, FieldError
 from appresso_food.nucleo.models import Product
-from appresso_food.nucleo.limpieza import clave
+from appresso_food.nucleo.limpieza import clave, parse_precio
 
 router = APIRouter()
 
@@ -52,9 +52,10 @@ def _validate(data: dict, required: Tuple[str, ...]) -> Tuple[Dict[str, Any], Li
             continue
         value = data[field]
         if field == "precio":
-            number, error = parse_value(value)
-            if error:
-                errors.append(FieldError("precio", error.codigo, error.mensaje))
+            # Limpieza: "$12.000", "12.000" y "12.000,50" son precios escritos a la colombiana, no 12 pesos.
+            number = parse_precio(value)
+            if number is None:
+                errors.append(FieldError("precio", INVALID_VALUE, f"'precio' debe ser un número mayor a 0 (ej: 16000 o \"$16.000\"); llegó {value!r}."))
             else:
                 clean["precio"] = number
         elif not isinstance(value, str):
