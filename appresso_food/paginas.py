@@ -17,7 +17,7 @@ from appresso_food.nucleo import analitica, facturacion, mapa, ranking, runtime,
 from appresso_food.nucleo.limpieza import duplicados, duplicados_ingenuo, nombre_propio, normalizar_texto, reporte_calidad
 from appresso_food.nucleo.algorithms import (
     count_orders_per_client, count_orders_per_client_naive, find_order_linear, insertion_sort_by_total, merge_sort_by_date,
-    recursive_total_units, top_items, total_units_sold,
+    recursive_total_sales, top_items, total_sales,
 )
 from appresso_food.nucleo.counter import OperationCounter
 from appresso_food.nucleo.demo_data import generate_demo_orders
@@ -459,8 +459,8 @@ def _medir_laboratorio(size: int) -> List[dict]:
         busca, suma, recursivo = OperationCounter(), OperationCounter(), OperationCounter()
         inicio = time.perf_counter()
         find_order_linear(muestra, muestra[-1].order_id, busca)  # peor caso: el pedido buscado es el último
-        total_units_sold(muestra, suma)
-        recursive_total_units(muestra, recursivo)
+        total_sales(muestra, suma)
+        recursive_total_sales(muestra, recursivo)
         filas.append({
             "n": n, "comparaciones": busca.comparisons, "sumas": suma.additions, "llamadas": recursivo.calls,
             "profundidad": recursivo.max_depth, "ms": (time.perf_counter() - inicio) * 1000,

@@ -18,21 +18,20 @@ def find_order_linear(orders: List[Order], target_id: int, counter: OperationCou
     return None
 
 
-def total_units_sold(orders: List[Order], counter: OperationCounter) -> int:
-    """Suma todas las unidades vendidas: una suma por ítem. O(n) porque cada pedido trae pocos ítems (acotados)."""
-    total = 0
+def total_sales(orders: List[Order], counter: OperationCounter) -> float:
+    """Suma de ventas: el total de cada pedido, una suma por pedido. Exactamente n sumas: O(n)."""
+    total = 0.0
     for order in orders:
-        for item in order.items:
-            counter.additions += 1
-            total += item.quantity
+        counter.additions += 1
+        total += order.total
     return total
 
 
-def recursive_total_units(orders: List[Order], counter: OperationCounter) -> int:
-    """Mismo total que total_units_sold pero por divide y vencerás (recursividad
-    controlada): reparte la lista en mitades hasta llegar a un pedido y combina
-    resultados. Trabajo total O(n): hace 2n - 1 llamadas. Lo logarítmico es solo
-    la profundidad de la recursión, O(log n).
+def recursive_total_sales(orders: List[Order], counter: OperationCounter) -> float:
+    """La misma suma de ventas por divide y vencerás: parte la lista en mitades hasta llegar a un pedido.
+
+    Hace 2n - 1 llamadas: n que llegan a un pedido y devuelven su total, y n - 1 que parten la lista y suman
+    las dos mitades (con n = 10: 10 + 9 = 19). Trabajo O(n); lo logarítmico es solo la profundidad, O(log n).
     """
     def analyze_range(start: int, end: int, depth: int = 1) -> int:
         counter.calls += 1
@@ -40,11 +39,7 @@ def recursive_total_units(orders: List[Order], counter: OperationCounter) -> int
         if start >= end:
             return 0
         if end - start == 1:
-            subtotal = 0
-            for item in orders[start].items:
-                counter.additions += 1
-                subtotal += item.quantity
-            return subtotal
+            return orders[start].total
 
         midpoint = start + (end - start) // 2
         left_total = analyze_range(start, midpoint, depth + 1)

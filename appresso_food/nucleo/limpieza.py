@@ -7,6 +7,7 @@ registrados dos veces ("ana lópez" / "Ana Lopez").
 Se usa en las fronteras (al crear productos y pedidos) y en GET /api/calidad.
 """
 
+import math
 import re
 import unicodedata
 from typing import Dict, Iterable, List, Optional
@@ -54,7 +55,7 @@ def parse_precio(valor) -> Optional[float]:
         elif texto.count(".") > 1 or re.fullmatch(r"\d{1,3}\.\d{3}", texto):
             texto = texto.replace(".", "")  # 12.000 o 1.250.000: puntos de miles
         numero = float(texto)
-    return numero if numero > 0 else None
+    return numero if 0 < numero and math.isfinite(numero) else None  # "999…9" (400 cifras) sería infinito
 
 
 def duplicados(valores: Iterable[str], counter: Optional[OperationCounter] = None) -> Dict[str, List[str]]:

@@ -1,7 +1,7 @@
 import math
 import unittest
 
-from appresso_food.nucleo.algorithms import find_order_linear, recursive_total_units, total_units_sold
+from appresso_food.nucleo.algorithms import find_order_linear, recursive_total_sales, total_sales
 from appresso_food.nucleo.counter import OperationCounter
 from appresso_food.nucleo.models import Order, OrderItem
 from test_gestos import _ConBaseTemporal
@@ -30,20 +30,21 @@ class AlgorithmsTest(unittest.TestCase):
         self.assertIsNone(found)
         self.assertEqual(counter.comparisons, len(self.orders))
 
-    def test_total_units_sold_matches_recursive_total(self):
+    def test_suma_de_ventas_iterativa_y_recursiva_coinciden(self):
         counter_iter = OperationCounter()
         counter_rec = OperationCounter()
 
-        iterative_total = total_units_sold(self.orders, counter_iter)
-        recursive_total = recursive_total_units(self.orders, counter_rec)
+        iterative_total = total_sales(self.orders, counter_iter)
+        recursive_total = recursive_total_sales(self.orders, counter_rec)
 
         self.assertEqual(iterative_total, recursive_total)
-        self.assertEqual(iterative_total, 2 + 1 + 3 + 4)
+        self.assertEqual(iterative_total, sum(o.total for o in self.orders))
+        self.assertEqual(counter_iter.additions, len(self.orders))  # una suma por pedido: exactamente n
 
     def test_la_recursion_hace_2n_menos_1_llamadas_y_baja_log_n_niveles(self):
         for n in (1, 8, 100, 1000):
             counter = OperationCounter()
-            recursive_total_units([make_order(i, [1]) for i in range(n)], counter)
+            recursive_total_sales([make_order(i, [1]) for i in range(n)], counter)
             self.assertEqual(counter.calls, 2 * n - 1)
             self.assertEqual(counter.max_depth, math.ceil(math.log2(n)) + 1)
 
@@ -52,8 +53,8 @@ class LaboratorioTest(_ConBaseTemporal):
     def test_la_tabla_muestra_cada_n_hasta_el_elegido(self):
         html = self.client.post("/laboratorio", data={"size": "1000"}).text
         for n in (10, 100, 1000):
-            self.assertIn(f"<td>{n}</td><td>{n}</td>", html)  # peor caso: n comparaciones
-            self.assertIn(f"<td>{2 * n - 1}</td>", html)
+            self.assertIn(f"<td>{n}</td><td>{n}</td><td>{n}</td>", html)  # n comparaciones (peor caso) y n sumas de ventas
+            self.assertIn(f"<td>{2 * n - 1} <small>({n} + {n - 1})</small></td>", html)  # llamadas desglosadas
         self.assertNotIn("<td>10000</td>", html)
 
     def test_el_csv_se_genera_y_no_se_sirven_archivos_del_disco(self):

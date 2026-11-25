@@ -31,7 +31,10 @@ class ProductValidationTests(unittest.TestCase):
     def test_string_price_is_normalized_and_abc_is_never_zero(self):
         clean, errors, _ = productos_api._validate({"nombre": "Monitor", "precio": "50000"}, ("nombre", "precio"))
         self.assertEqual((clean["precio"], errors), (50000.0, []))
-        for bad in ("abc", "-5", 0, "50.000,00", True, [1], None):
+        for escrito, numero in (("$12.000", 12000), ("12.000", 12000), ("50.000,00", 50000), ("12,000.50", 12000.5)):
+            clean, errors, _ = productos_api._validate({"nombre": "Monitor", "precio": escrito}, ("nombre", "precio"))
+            self.assertEqual((clean.get("precio"), errors), (numero, []), escrito)  # limpieza: nunca "12 pesos"
+        for bad in ("abc", "-5", 0, True, [1], None, 1_000_000_001, "$2.000.000.000"):  # también por encima del tope
             clean, errors, _ = productos_api._validate({"nombre": "Monitor", "precio": bad}, ("nombre", "precio"))
             self.assertTrue(errors and "precio" not in clean, bad)
 

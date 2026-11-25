@@ -62,8 +62,8 @@ comparación de canales para las vistas.
 ## 10. `algorithms.py` + `counter.py`
 Igual que en el proyecto original, pero aplicados a pedidos reales:
 - `find_order_linear()`: búsqueda lineal O(n).
-- `total_units_sold()`: suma de unidades O(n).
-- `recursive_total_units()`: mismo total por divide y vencerás (trabajo
+- `total_sales()`: suma de ventas, una por pedido: exactamente n sumas, O(n).
+- `recursive_total_sales()`: misma suma por divide y vencerás (2n − 1 llamadas, trabajo
   O(n), profundidad O(log n)).
 `OperationCounter` cuenta comparaciones, sumas y llamadas para justificar
 la complejidad frente al profesor.

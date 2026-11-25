@@ -163,7 +163,7 @@ class LimpiezaTest(unittest.TestCase):
         for texto, numero in (("$12.000", 12000), ("12.000,50", 12000.5), ("12,000.50", 12000.5), ("12,5", 12.5),
                               ("1.250.000", 1250000), (16000, 16000)):
             self.assertEqual(parse_precio(texto), numero, texto)
-        for malo in ("abc", "", "-5", 0, None, True):
+        for malo in ("abc", "", "-5", 0, None, True, "9" * 400, float("inf"), float("nan")):
             self.assertIsNone(parse_precio(malo), malo)
 
     def test_duplicados_rapido_e_ingenuo_coinciden(self):
