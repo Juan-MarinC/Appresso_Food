@@ -38,35 +38,42 @@
      * El borde derecho es la transacción más reciente; el izquierdo, N segundos antes.
      * entries: [{idTxn, fecha(ISO), valor}]  - windowSeconds - limit
      */
+    // Ventana deslizante de un usuario: barra de tiempo (de "hace N s" a "ahora") con sus transacciones como puntos.
+    // En HTML y no en SVG: así textos y puntos conservan su tamaño en cualquier ancho (panel, pasarela, celular).
+    // Las que caen casi al mismo tiempo (una ráfaga) se agrupan en un círculo con el número; el detalle va en etiquetas.
+    // (Se llama windowSvg por compatibilidad con quienes la usan.)
     function windowSvg(entries, windowSeconds, limit, anchorIso) {
-        const W = 640, H = 112, padL = 14, padR = 14, trackY = 64, trackH = 18;
-        const inner = W - padL - padR;
         const list = (entries || []).map((e) => ({ ...e, t: new Date(e.fecha).getTime() })).sort((a, b) => a.t - b.t);
         const anchor = anchorIso ? new Date(anchorIso).getTime() : (list.length ? list[list.length - 1].t : Date.now());
-        const x = (t) => padL + Math.max(0, Math.min(1, 1 - (anchor - t) / (windowSeconds * 1000))) * inner;
-        const hot = list.length >= limit;
-        let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Ventana deslizante de ${windowSeconds} segundos">`;
-        svg += `<rect class="w-track" x="${padL}" y="${trackY}" width="${inner}" height="${trackH}" rx="9"/>`;
-        for (let s = 0; s <= windowSeconds; s++) {
-            const tx = padL + (s / windowSeconds) * inner;
-            svg += `<line class="w-tick" x1="${tx}" x2="${tx}" y1="${trackY}" y2="${trackY + trackH}"/>`;
-            if (windowSeconds <= 30 || s % 5 === 0) {
-                svg += `<text x="${tx}" y="${trackY + trackH + 14}" text-anchor="middle">-${windowSeconds - s}s</text>`;
-            }
+        const pct = (t) => 100 * Math.max(0, Math.min(1, 1 - (anchor - t) / (windowSeconds * 1000)));
+        const tono = list.length >= limit ? "hot" : (list.length === limit - 1 ? "warn" : "");
+        const grupos = [];
+        for (const e of list) {
+            const x = pct(e.t), ultimo = grupos[grupos.length - 1];
+            if (ultimo && x - ultimo.x < 3) { ultimo.items.push(e); ultimo.x = (ultimo.x * (ultimo.items.length - 1) + x) / ultimo.items.length; }
+            else grupos.push({ x, items: [e] });
         }
-        svg += `<text x="${padL}" y="14" text-anchor="start">salen ◄</text><text x="${W - padR}" y="14" text-anchor="end">► entran (más reciente)</text>`;
-        list.forEach((e, i) => {
-            const cx = x(e.t);
-            const lift = (i % 3) * 13; // 3 niveles para que las etiquetas cercanas no se monten
-            svg += `<circle class="w-dot ${hot ? "hot" : (list.length === limit - 1 ? "warn" : "")}" cx="${cx}" cy="${trackY + trackH / 2}" r="8"><title>${esc(e.idTxn)} · ${time(e.fecha)} · ${money(e.valor)}</title></circle>`;
+        const paso = windowSeconds <= 10 ? 2 : windowSeconds <= 30 ? 5 : 10;
+        const segundos = [];
+        for (let s = windowSeconds; s >= 0; s -= paso) segundos.push(s);
+        const marcas = segundos.slice(1, -1).map((s) => `<span class="wviz__marca" style="left:${100 * (1 - s / windowSeconds)}%"></span>`).join("");
+        const puntos = grupos.map((g) => {
+            const titulo = g.items.map((e) => `#${e.idTxn} · ${time(e.fecha)} · ${money(e.valor)}`).join("\n");
+            const varios = g.items.length > 1;
+            return `<span class="wviz__punto ${tono} ${varios ? "wviz__punto--grupo" : ""}" style="left:${g.x}%" title="${esc(titulo)}">${varios ? g.items.length : ""}</span>`;
+        }).join("");
+        const eje = segundos.map((s) => `<span>${s === 0 ? "ahora" : `hace ${s} s`}</span>`).join("");
+        const recientes = list.slice().reverse();
+        const etiquetas = recientes.slice(0, 5).map((e) => {
             const id = String(e.idTxn);
-            const short = id.length > 12 ? "…" + id.slice(-9) : id;
-            const side = cx > W - 70 ? "end" : cx < 70 ? "start" : "middle";
-            const lx = side === "end" ? cx + 8 : side === "start" ? cx - 8 : cx;
-            svg += `<text class="w-label" x="${lx}" y="${trackY - 8 - lift}" text-anchor="${side}">#${esc(short)}</text>`;
-        });
-        svg += `</svg>`;
-        return svg;
+            const hace = Math.max(0, (anchor - e.t) / 1000);
+            return `<span class="wchip"><b>#${esc(id.length > 14 ? "…" + id.slice(-11) : id)}</b> hace ${hace.toFixed(hace < 10 ? 1 : 0).replace(".", ",")} s · ${money(e.valor)}</span>`;
+        }).join("");
+        const mas = recientes.length > 5 ? `<span class="wchip wchip--mas">+${recientes.length - 5} más</span>` : "";
+        return `<div class="wviz" role="img" aria-label="${list.length} transacciones en los últimos ${windowSeconds} segundos">
+            <div class="wviz__pista ${tono}">${marcas}${puntos}</div>
+            <div class="wviz__eje">${eje}</div>
+            ${list.length ? `<div class="wviz__lista">${etiquetas}${mas}</div>` : ""}</div>`;
     }
 
     function chip(kind, value) {

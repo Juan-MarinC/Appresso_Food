@@ -4,7 +4,7 @@
 {% block titulo %}Antifraude - Appresso Food{% endblock %}
 
 {% block estilos %}
-  <link rel="stylesheet" href="/static/css/antifraude.css">
+  <link rel="stylesheet" href="/static/css/antifraude.css?v=4">
 {% endblock %}
 
 {% block hero %}
@@ -51,11 +51,16 @@
                 <span class="live">en vivo</span>
             </div>
             <p class="subtitle" style="margin:6px 0 14px;">
-                Ventana de <strong>{{ "%g"|format(config.window_seconds) }} s</strong> por usuario. Con cada transacción nueva <em>entra</em> a la ventana
-                y <em>salen</em> las que superan los {{ "%g"|format(config.window_seconds) }} s; si quedan
-                <strong>{{ config.max_transactions }} o más</strong> es una anomalía. Lo que sale de la ventana no se pierde: queda en el historial y en los logs.
+                Cada usuario tiene su propia ventana de los <strong>últimos {{ "%g"|format(config.window_seconds) }} segundos</strong>.
+                Cada punto es una transacción; las que llegan casi al mismo tiempo se juntan en un círculo con el número.
+                Con <strong>{{ config.max_transactions }} o más</strong> dentro de la ventana, la transacción se marca como posible fraude.
+                Las que tienen más de {{ "%g"|format(config.window_seconds) }} s salen de la ventana, pero no se pierden: quedan en el historial.
             </p>
-            <div id="window"><div class="empty">Cargando…</div></div>
+            {# Plegado: con miles de usuarios en la ventana, la lista completa ocupaba toda la página. #}
+            <details class="ventana-plegable" id="window-box">
+                <summary id="window-resumen">Cargando…</summary>
+                <div id="window"></div>
+            </details>
             <h3 style="margin:16px 0 4px; color:var(--primary-dark); font-size:1.05rem;">Últimas entradas y salidas</h3>
             <div id="winevents"></div>
         </div>
@@ -132,6 +137,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/fraud-common.js"></script>
-    <script src="/static/js/antifraude.js"></script>
+<script src="/static/js/fraud-common.js?v=4"></script>
+    <script src="/static/js/antifraude.js?v=3"></script>
 {% endblock %}
