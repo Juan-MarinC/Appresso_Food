@@ -330,5 +330,22 @@ class Ml5PaginaTest(unittest.TestCase):
         self.assertIn("3.2 KB", html)
 
 
+class ProyectoPaginaTest(unittest.TestCase):
+    """/proyecto: presentación del proyecto final junto al submódulo ml5.js."""
+
+    def setUp(self):
+        app = FastAPI()
+        app.include_router(paginas.router)
+        self.client = TestClient(app)
+
+    def test_tiene_todas_las_partes(self):
+        respuesta = self.client.get("/proyecto")
+        self.assertEqual(respuesta.status_code, 200)
+        for seccion in ("que-es", "capas", "mapa-web", "pasarela", "integridad", "laboratorio", "ia", "criterios",
+                        "bugs-pasarela", "bugs-seguridad", "bugs-datos", "bugs-kiosko", "pruebas", "conclusiones"):
+            self.assertIn(f'id="{seccion}"', respuesta.text)
+        self.assertIn('aria-current="page">Proyecto final', respuesta.text)
+
+
 if __name__ == "__main__":
     unittest.main()

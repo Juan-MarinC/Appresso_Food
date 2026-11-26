@@ -1,0 +1,536 @@
+{% extends "base.html" %}
+{% set pagina = "gestos" %}
+{% set subpagina = "proyecto" %}
+
+{% block titulo %}Proyecto final - Appresso Food{% endblock %}
+
+{% block estilos %}
+  <link rel="stylesheet" href="/static/css/gestos.css?v=2">
+  <link rel="stylesheet" href="/static/css/ml5.css?v=2">
+  <link rel="stylesheet" href="/static/css/proyecto.css?v=1">
+{% endblock %}
+
+{% block hero %}
+<section class="pagina-cabeza">
+  <div class="pagina-cabeza__fila">
+    <h1>Appresso Food · Proyecto final</h1>
+    <p>Presentación completa: qué hace la web, cómo funciona por dentro, para qué sirve cada parte, los bugs que encontramos y cómo los resolvimos.</p>
+    {% include "_gestos_nav.html" %}
+  </div>
+</section>
+{% endblock %}
+
+{% block contenido %}
+<div class="ml5">
+<aside class="ml5__indice" aria-label="En esta página">
+  <ol>
+    <li><a href="#parte-1">Introducción</a>
+      <ol>
+        <li><a href="#que-es">¿Qué es Appresso Food?</a></li>
+        <li><a href="#tecnologias">Tecnologías</a></li>
+      </ol>
+    </li>
+    <li><a href="#parte-2">Arquitectura</a>
+      <ol>
+        <li><a href="#capas">Capas del sistema</a></li>
+        <li><a href="#datos">Bases de datos</a></li>
+      </ol>
+    </li>
+    <li><a href="#parte-3">Qué hace la web</a>
+      <ol>
+        <li><a href="#mapa-web">Mapa de la web</a></li>
+        <li><a href="#pedidos">Pedidos y domicilios</a></li>
+        <li><a href="#kiosko">Kiosko con gestos</a></li>
+        <li><a href="#cocina">Cocina y turnos</a></li>
+        <li><a href="#facturacion">Facturación y pagos</a></li>
+        <li><a href="#pasarela">Pasarela antifraude</a></li>
+        <li><a href="#integridad">Integridad</a></li>
+        <li><a href="#calidad">Limpieza y calidad</a></li>
+        <li><a href="#administracion">Administración y API</a></li>
+        <li><a href="#laboratorio">Laboratorio Big O</a></li>
+        <li><a href="#ia">Modelos de IA</a></li>
+        <li><a href="#paneles">Paneles y logs</a></li>
+      </ol>
+    </li>
+    <li><a href="#parte-4">Requisitos del final</a>
+      <ol>
+        <li><a href="#criterios">Criterio por criterio</a></li>
+      </ol>
+    </li>
+    <li><a href="#parte-5">Bugs y soluciones</a>
+      <ol>
+        <li><a href="#bugs-pasarela">Pasarela y MongoDB</a></li>
+        <li><a href="#bugs-seguridad">Seguridad</a></li>
+        <li><a href="#bugs-datos">Datos y cálculos</a></li>
+        <li><a href="#bugs-kiosko">Kiosko y pantalla</a></li>
+      </ol>
+    </li>
+    <li><a href="#parte-6">Calidad y despliegue</a>
+      <ol>
+        <li><a href="#seguridad">Seguridad y privacidad</a></li>
+        <li><a href="#pruebas">Pruebas</a></li>
+        <li><a href="#despliegue">Docker y ngrok</a></li>
+      </ol>
+    </li>
+    <li><a href="#parte-7">Cierre</a>
+      <ol>
+        <li><a href="#demo">Guion de demostración</a></li>
+        <li><a href="#limites">Limitaciones</a></li>
+        <li><a href="#conclusiones">Conclusiones</a></li>
+      </ol>
+    </li>
+  </ol>
+</aside>
+
+<div class="ml5__contenido">
+
+<!-- ============================== PARTE 1 ============================== -->
+<div class="ml5__parte" id="parte-1"><span>Parte 1</span><h2>Introducción</h2></div>
+
+<section class="panel ml5__seccion" id="que-es">
+  <p class="eyebrow">Introducción</p>
+  <h2>¿Qué es Appresso Food?</h2>
+  <p><strong>Appresso Food es un sistema web para gestionar un restaurante de comida rápida</strong>: toma pedidos en el local y a domicilio, los lleva a cocina, emite la factura, cobra por una pasarela de pagos con detección de fraude y analiza los datos con algoritmos e inteligencia artificial.</p>
+  <div class="dos-columnas">
+    <div class="tarjeta">
+      <h3>Para qué</h3>
+      <p>Resolver el día a día de un local: pedir rápido, despachar primero el domicilio más cercano, cobrar sin fraude, facturar bien y saber qué se vende más y cuánto se va a vender.</p>
+    </div>
+    <div class="tarjeta">
+      <h3>Para quién</h3>
+      <p>El <strong>cliente</strong> (pide en la web o en el kiosko con gestos), el <strong>cajero y la cocina</strong> (atienden y despachan) y el <strong>administrador</strong> (menú, usuarios, facturas, fraude y reportes).</p>
+    </div>
+  </div>
+  <p><strong>De dónde viene:</strong> empezó como <em>Appresso Café</em>, un simulador de complejidad computacional. Lo convertimos en un negocio real de comida rápida sin perder los algoritmos: la búsqueda lineal ahora encuentra pedidos de cocina, la progresión aritmética proyecta la fidelización de clientes y la regresión lineal pronostica ventas.</p>
+  <p><strong>Accesibilidad:</strong> el kiosko con gestos permite pedir sin hablar, pensado para personas sordas o con dificultad para hablar.</p>
+</section>
+
+<section class="panel ml5__seccion" id="tecnologias">
+  <p class="eyebrow">Introducción</p>
+  <h2>Tecnologías</h2>
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Capa</th><th>Tecnología</th><th>Para qué la usamos</th></tr></thead>
+      <tbody>
+        <tr><td>Servidor</td><td>Python 3.12 · FastAPI · Uvicorn</td><td>Páginas, API REST y toda la lógica del negocio</td></tr>
+        <tr><td>Páginas</td><td>Jinja2 · HTML · CSS · JavaScript</td><td>Interfaz que se genera en el servidor; JavaScript solo para lo interactivo</td></tr>
+        <tr><td>Datos del negocio</td><td>SQLite</td><td>Productos, categorías, usuarios, barrios, pedidos, facturas y pagos</td></tr>
+        <tr><td>Pasarela antifraude</td><td>MongoDB</td><td>Transacciones, usuarios, anomalías y logs, con índices</td></tr>
+        <tr><td>Análisis</td><td>NumPy</td><td>Regresión lineal del pronóstico de ventas</td></tr>
+        <tr><td>IA en el navegador</td><td>TensorFlow.js · Simple Statistics · ml5.js</td><td>Clasificador de fraude, estadística por usuario y kiosko de gestos</td></tr>
+        <tr><td>Seguridad</td><td>HMAC-SHA256 · SHA-256 encadenado</td><td>Integridad de transacciones, facturas y pagos</td></tr>
+        <tr><td>Despliegue</td><td>Docker Compose · ngrok</td><td>App + MongoDB en contenedores, publicada con una URL fija</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================== PARTE 2 ============================== -->
+<div class="ml5__parte" id="parte-2"><span>Parte 2</span><h2>Arquitectura</h2></div>
+
+<section class="panel ml5__seccion" id="capas">
+  <p class="eyebrow">Arquitectura</p>
+  <h2>Capas del sistema</h2>
+  <ol class="capas">
+    <li><strong>Navegador</strong><span>Páginas HTML, carrito, mapa, kiosko con cámara, modelos de IA de TensorFlow.js</span></li>
+    <li><strong>FastAPI · paginas.py y api/</strong><span>Recibe cada petición: arma la página o responde JSON; registra todo en /logs</span></li>
+    <li><strong>Lógica · nucleo/ y antifraude/</strong><span>Grafo, heap, cola y pila, facturación, limpieza, algoritmos; validación, hash y ventana deslizante</span></li>
+    <li><strong>Datos · SQLite y MongoDB</strong><span>SQLite para el restaurante; MongoDB para la pasarela de pagos</span></li>
+  </ol>
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Carpeta</th><th>Qué contiene</th></tr></thead>
+      <tbody>
+        <tr><td><code>nucleo/</code></td><td>Restaurante: modelos, base de datos, grafo (Dijkstra), heap, cola y pila, facturación, limpieza, algoritmos, regresión</td></tr>
+        <tr><td><code>antifraude/</code></td><td>Pasarela: validación, hash HMAC, ventana deslizante, repositorio MongoDB y rutas</td></tr>
+        <tr><td><code>api/</code></td><td>API REST (productos, usuarios, categorías, hash, totales, gestos) y la bitácora HTTP</td></tr>
+        <tr><td><code>templates/</code> · <code>static/</code></td><td>Una plantilla por página, estilos, scripts y el modelo de gestos entrenado</td></tr>
+        <tr><td><code>tests/</code></td><td>Pruebas automáticas y scripts que prueban la app por la URL pública</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel ml5__seccion" id="datos">
+  <p class="eyebrow">Arquitectura</p>
+  <h2>Bases de datos y relaciones</h2>
+  <div class="dos-columnas">
+    <div class="tarjeta">
+      <h3>SQLite · restaurante</h3>
+      <p>Productos, categorías, usuarios con rol, ingredientes, barrios, pedidos, ítems, facturas y pagos. Relaciones reales: <strong>pedido ↔ barrio</strong>, <strong>pedido ↔ producto</strong> (tabla puente <code>order_items</code>) y <strong>producto ↔ ingrediente</strong> para descontar inventario.</p>
+    </div>
+    <div class="tarjeta">
+      <h3>MongoDB · pasarela</h3>
+      <p>Colecciones <code>usuarios</code>, <code>transacciones</code>, <code>anomalias</code>, <code>logs</code> y la cuarentena de peticiones inválidas. Índices por usuario, fecha, estado e ID; el ID de transacción es único entre las aceptadas.</p>
+    </div>
+  </div>
+  <p class="subtitle">Ejemplo de consulta con las relaciones: «¿qué producto es el más pedido en Belén?» se responde con un solo JOIN entre pedidos, ítems, productos y barrios.</p>
+</section>
+
+<!-- ============================== PARTE 3 ============================== -->
+<div class="ml5__parte" id="parte-3"><span>Parte 3</span><h2>Qué hace la web</h2></div>
+
+<section class="panel ml5__seccion" id="mapa-web">
+  <p class="eyebrow">Qué hace</p>
+  <h2>Mapa de la web</h2>
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Página</th><th>Qué hace</th><th>Quién la usa</th></tr></thead>
+      <tbody>
+        <tr><td><a href="/">/</a></td><td>Menú, carrito y pedido en el local o a domicilio con la ruta en el mapa</td><td>Cliente</td></tr>
+        <tr><td><a href="/gestos">/gestos</a></td><td>Kiosko: pedir con la mano frente a la cámara</td><td>Cliente</td></tr>
+        <tr><td><a href="/entrenar">/entrenar</a> · <a href="/gestos/ml5">/gestos/ml5</a></td><td>Entrenar la red de gestos · explicación y laboratorio de ml5.js</td><td>Equipo</td></tr>
+        <tr><td><a href="/turnos">/turnos</a></td><td>Pantalla del mostrador: en preparación y listos</td><td>Cliente</td></tr>
+        <tr><td><a href="/cocina">/cocina</a></td><td>Cola de pedidos, despacho de domicilios, deshacer y avisos de ayuda</td><td>Cocina</td></tr>
+        <tr><td><a href="/facturas">/facturas</a></td><td>Facturas, descuentos, notas crédito, pagos y cadena de integridad</td><td>Caja</td></tr>
+        <tr><td><a href="/administracion">/administracion</a></td><td>Usuarios con roles, categorías y productos</td><td>Administrador</td></tr>
+        <tr><td><a href="/transacciones">/transacciones</a></td><td>Formulario de pagos de la pasarela</td><td>Cliente · pruebas</td></tr>
+        <tr><td><a href="/antifraude">/antifraude</a></td><td>Dashboard de fraude: estados, anomalías, cuarentena y ventana en vivo</td><td>Administrador</td></tr>
+        <tr><td><a href="/panel">/panel</a> · <a href="/dashboard">/dashboard</a></td><td>Ventas, rankings, alertas, calidad e integridad</td><td>Administrador</td></tr>
+        <tr><td><a href="/laboratorio">/laboratorio</a></td><td>Análisis experimental de algoritmos (Big O)</td><td>Académico</td></tr>
+        <tr><td><a href="/ia">/ia</a></td><td>Clasificador de fraude, perfiles estadísticos y pronóstico de demanda</td><td>Administrador</td></tr>
+        <tr><td><a href="/logs">/logs</a> · <a href="/docs">/docs</a></td><td>Cada petición en vivo · documentación interactiva de la API</td><td>Equipo · profesor</td></tr>
+        <tr><td><a href="/privacidad">/privacidad</a></td><td>Qué datos se guardan y derechos (Ley 1581 de 2012)</td><td>Todos</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel ml5__seccion" id="pedidos">
+  <p class="eyebrow">Módulo · restaurante</p>
+  <h2>Pedidos y domicilios</h2>
+  <p><strong>Qué hace:</strong> el cliente arma su pedido con fotos, filtros y un resumen en vivo; elige comer en el local o domicilio. A domicilio, la app calcula la ruta y la muestra en el mapa.</p>
+  <ol class="flujo">
+    <li><strong>Grafo + Dijkstra</strong><span>Barrios = nodos, distancias = aristas. Calcula la ruta más corta (a veces pasando por otros barrios)</span></li>
+    <li><strong>Heap de despacho</strong><span>Sale primero el domicilio más cercano, aunque haya llegado después</span></li>
+    <li><strong>Cola FIFO</strong><span>Cocina atiende en el orden de llegada</span></li>
+    <li><strong>Pila LIFO</strong><span>Deshacer la última acción: crear, atender o despachar</span></li>
+    <li><strong>Cobertura</strong><span>Un barrio que no está en el grafo se rechaza</span></li>
+    <li><strong>Inventario</strong><span>Cada producto descuenta sus ingredientes; avisa si se acaban</span></li>
+  </ol>
+  <p><strong>Para qué:</strong> despachar más rápido, no aceptar pedidos imposibles de entregar y no vender lo que no hay. También: ranking de lo más pedido (general y por barrio), historial del cliente con <strong>fidelización</strong> (progresión aritmética) y <strong>pronóstico de ventas</strong> por canal (regresión lineal).</p>
+</section>
+
+<section class="panel ml5__seccion" id="kiosko">
+  <p class="eyebrow">Módulo · accesibilidad</p>
+  <h2>Kiosko con gestos (ml5.js)</h2>
+  <p><strong>Qué hace:</strong> el cliente pide sin tocar ni hablar. 1 dedo = comer aquí, 2 = para llevar; de 1 a 4 dedos elige el combo y la cantidad; pulgar arriba agrega y confirma; puño cancela; palma abierta pide ayuda a un empleado. Sugiere un extra, acepta notas para cocina y tiene texto grande, alto contraste y lectura en voz alta.</p>
+  <p><strong>Cómo:</strong> <code>ml5.handPose</code> encuentra 21 puntos de la mano y una red propia (<code>ml5.neuralNetwork</code>, 42 → 16 → 8) reconoce el gesto. Entrenada con 1.152 ejemplos; el modelo pesa 8 KB y viene en el repositorio. Si la red duda, deciden reglas de distancias. Todo corre en el navegador: <strong>no se guarda ni se envía ninguna imagen</strong>.</p>
+  <p><strong>Para qué:</strong> inclusión de personas sordas o con dificultad para hablar, y pedir sin tocar pantallas compartidas. La explicación completa y un laboratorio en vivo están en <a href="/gestos/ml5">ml5.js</a>.</p>
+</section>
+
+<section class="panel ml5__seccion" id="cocina">
+  <p class="eyebrow">Módulo · operación</p>
+  <h2>Cocina y turnos</h2>
+  <p><strong>Qué hace:</strong> <a href="/cocina">/cocina</a> muestra la cola de pendientes, el heap de domicilios, los pedidos para llevar (y si están pagados) y los avisos de ayuda del kiosko. Atender, despachar y deshacer cambian el estado del pedido. <a href="/turnos">/turnos</a> es la pantalla del mostrador con lo que se prepara y lo que está listo.</p>
+  <p><strong>Seguridad:</strong> los botones de cocina solo funcionan en el equipo del local, con un token que se genera en cada arranque del servidor. Por la URL pública la cocina queda en solo lectura.</p>
+</section>
+
+<section class="panel ml5__seccion" id="facturacion">
+  <p class="eyebrow">Módulo · operación</p>
+  <h2>Facturación y pagos</h2>
+  <div class="dos-columnas">
+    <div class="tarjeta">
+      <h3>Factura</h3>
+      <p>Se emite al crear el pedido con consecutivo <code>FV-000001</code>, impuesto al consumo del 8 % incluido y descuento de cajero de 0 a 30 %. Anular no borra: emite una <strong>nota crédito</strong> <code>NC-…</code>.</p>
+    </div>
+    <div class="tarjeta">
+      <h3>Pago</h3>
+      <p>El botón Pagar lleva a la pasarela con el total exacto. Una transacción <code>VALID</code> por ese valor marca el pedido como pagado. Después se adjunta el comprobante (PNG, JPG o PDF) con su huella SHA-256.</p>
+    </div>
+  </div>
+  <p><strong>Para qué:</strong> cumplir con una facturación ordenada y trazable, y que solo el dueño del pedido pueda pagarlo (clave propia del pedido; sin ella, 403).</p>
+</section>
+
+<section class="panel ml5__seccion" id="pasarela">
+  <p class="eyebrow">Módulo · pagos</p>
+  <h2>Pasarela de pagos con detección de fraude</h2>
+  <p><strong>Qué hace:</strong> recibe transacciones por <code>POST /api/transactions</code> (formulario, Postman, bots de Telegram, otra página web) y las clasifica en <strong>VALID</strong>, <strong>SUSPICIOUS</strong> o <strong>REJECTED</strong>.</p>
+  <ol class="flujo">
+    <li><strong>1 · Datos</strong><span>Valida cada campo y reúne todos los errores. «abc» nunca se vuelve 0</span></li>
+    <li><strong>2 · Hash</strong><span>HMAC-SHA256 con la llave de la clase; si no coincide, HASH_MISMATCH</span></li>
+    <li><strong>3 · Duplicado</strong><span>Un ID ya aceptado responde 409</span></li>
+    <li><strong>4 · Ventana</strong><span>3 o más del mismo usuario en 10 s → POSSIBLE_FRAUD</span></li>
+    <li><strong>5 · Franjas</strong><span>Límite por horario: mañana 10, tarde 6, noche 3</span></li>
+    <li><strong>6 · Guardar</strong><span>MongoDB + log; las inválidas van a cuarentena</span></li>
+  </ol>
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Código HTTP</th><th>Significado</th></tr></thead>
+      <tbody>
+        <tr><td><code>201</code></td><td>Válida</td></tr>
+        <tr><td><code>202</code></td><td>Sospechosa: entró y quedó guardada, pero marcada como posible fraude</td></tr>
+        <tr><td><code>422</code></td><td>Datos inválidos o hash alterado (explica la causa)</td></tr>
+        <tr><td><code>409</code></td><td>ID de transacción repetido</td></tr>
+        <tr><td><code>400</code> · <code>503</code></td><td>Cuerpo vacío o que no es JSON · MongoDB no disponible (reintentable)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><strong>Para qué:</strong> detectar ráfagas de compras del mismo usuario (típico de fraude con tarjetas robadas) y garantizar que los datos no se alteraron en el camino. El <a href="/antifraude">dashboard antifraude</a> muestra totales por día, semana y mes, anomalías, mapa de calor por hora, la cuarentena y la ventana deslizante en vivo.</p>
+</section>
+
+<section class="panel ml5__seccion" id="integridad">
+  <p class="eyebrow">Módulo · seguridad</p>
+  <h2>Integridad de facturas y pagos</h2>
+  <p><strong>Qué hace:</strong> cada factura y cada pago guarda <code>hash = SHA-256(datos + hash anterior)</code>, como una cadena de bloques. <a href="/api/integridad">/api/integridad</a> recorre la cadena y dice si alguien <strong>cambió, borró o insertó</strong> un registro y en cuál.</p>
+  <p><strong>Para demostrarlo:</strong> cambiar un total directo en la base (<code>UPDATE invoices SET total = 1 WHERE number = 'FV-000001'</code>) y abrir <a href="/facturas">/facturas</a>: marca el registro donde se rompe la cadena.</p>
+  <p><strong>Para qué:</strong> que nadie, ni siquiera alguien con acceso a la base, pueda maquillar una venta sin que se note.</p>
+</section>
+
+<section class="panel ml5__seccion" id="calidad">
+  <p class="eyebrow">Módulo · datos</p>
+  <h2>Limpieza y calidad de datos</h2>
+  <p><strong>Qué hace:</strong> <code>nucleo/limpieza.py</code> corrige espacios, nombres de persona, claves sin tildes, precios mal escritos (<code>$12.000</code>, <code>12,000.50</code>, <code>50.000,00</code>) y duplicados. Se aplica al crear pedidos, productos y usuarios. <a href="/api/calidad">/api/calidad</a> entrega un reporte con puntaje.</p>
+  <p><strong>Para qué:</strong> que los reportes y la IA trabajen con datos limpios; un «Juan  pérez» y un «juan perez» son el mismo cliente.</p>
+</section>
+
+<section class="panel ml5__seccion" id="administracion">
+  <p class="eyebrow">Módulo · administración</p>
+  <h2>Administración y API REST</h2>
+  <p><strong>Qué hace:</strong> CRUD completo de <strong>usuarios con roles</strong> (admin, cajero, cocina, repartidor y cliente), <strong>categorías</strong> y <strong>productos</strong>, en <a href="/administracion">/administracion</a> y por API.</p>
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Método</th><th>Ejemplo</th><th>Qué hace</th></tr></thead>
+      <tbody>
+        <tr><td>GET</td><td><code>/api/productos</code></td><td>Consultar</td></tr>
+        <tr><td>POST</td><td><code>/api/productos</code></td><td>Crear</td></tr>
+        <tr><td>PUT</td><td><code>/api/productos/{id}</code></td><td>Reemplazar completo</td></tr>
+        <tr><td>PATCH</td><td><code>/api/productos/{id}</code></td><td>Cambiar solo lo enviado</td></tr>
+        <tr><td>DELETE</td><td><code>/api/productos/{id}</code></td><td>Eliminar (409 si está en pedidos)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>También: <code>/api/hash/calcular</code> y <code>/api/hash/verificar</code> para cualquier JSON, y <code>/api/totales</code> (descomposición: valida cada producto, salta los inválidos y suma). <a href="/docs">/docs</a> permite probar cada ruta con un botón.</p>
+</section>
+
+<section class="panel ml5__seccion" id="laboratorio">
+  <p class="eyebrow">Módulo · académico</p>
+  <h2>Laboratorio de algoritmos (Big O)</h2>
+  <p><strong>Qué hace:</strong> <a href="/laboratorio">/laboratorio</a> genera pedidos de prueba (10 hasta 25.000), ejecuta cada algoritmo, <strong>cuenta las operaciones</strong> y mide el tiempo. Exporta CSV para el informe.</p>
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Algoritmo</th><th>Complejidad</th><th>Uso real</th></tr></thead>
+      <tbody>
+        <tr><td>Búsqueda lineal de un pedido</td><td>O(n)</td><td>Encontrar un pedido en cocina</td></tr>
+        <tr><td>Suma de ventas</td><td>O(n): exactamente n sumas</td><td>Total vendido</td></tr>
+        <tr><td>Suma recursiva (divide y vencerás)</td><td>O(n) llamadas, profundidad O(log n)</td><td>El mismo total, por mitades</td></tr>
+        <tr><td>Pedidos por cliente: ingenuo → diccionario</td><td>O(n²) → <strong>O(n)</strong></td><td>Optimización documentada</td></tr>
+        <tr><td>Inserción → merge sort por fecha</td><td>O(n²) → <strong>O(n log n)</strong></td><td>Ordenar pedidos</td></tr>
+        <tr><td>Ranking de ítems</td><td>O(n + m log m)</td><td>Lo más vendido</td></tr>
+        <tr><td>Dijkstra · heap</td><td>O((V + E) log V) · O(log n)</td><td>Rutas y despacho</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><strong>Para qué:</strong> demostrar con números, no solo con teoría, cuánto mejora un algoritmo cuando crecen los datos.</p>
+</section>
+
+<section class="panel ml5__seccion" id="ia">
+  <p class="eyebrow">Módulo · inteligencia artificial</p>
+  <h2>Modelos de IA</h2>
+  <div class="dos-columnas">
+    <div class="tarjeta">
+      <h3>Clasificador de fraude</h3>
+      <p>Red de TensorFlow.js en <a href="/ia">/ia</a>: monto, hora, día, método de pago, firma (válida, ausente o alterada), frecuencia en la ventana e historial. Normaliza, balancea las clases con ruido gaussiano y se evalúa con 20 % de prueba: matriz de confusión, precisión, sensibilidad y F1. Se guarda y se carga.</p>
+    </div>
+    <div class="tarjeta">
+      <h3>Estadística y pronóstico</h3>
+      <p>Con Simple Statistics: perfil por usuario (cuartiles, rango intercuartílico, puntaje z) y por empleado (descuentos y anulaciones). Regresión lineal de demanda comparada con una red de TensorFlow sobre los últimos 7 días.</p>
+    </div>
+  </div>
+  <p>Y el <strong>reconocimiento de gestos</strong> con ml5.js del kiosko. Los datos para entrenar salen de <code>/api/ia/operaciones</code> (usuario seudonimizado) y <code>/api/ia/demanda</code>.</p>
+  <p><strong>Para qué:</strong> pasar de reglas fijas («3 en 10 s») a un modelo que aprende patrones de fraude, y anticipar cuánto se va a vender.</p>
+</section>
+
+<section class="panel ml5__seccion" id="paneles">
+  <p class="eyebrow">Módulo · seguimiento</p>
+  <h2>Paneles y logs</h2>
+  <p><a href="/panel">/panel</a> reúne ventas, alertas antifraude, métricas del modelo de fraude, patrones (cuartiles de montos, atípicos, pedidos por hora y canal), descuentos y anulaciones por empleado, calidad de datos, integridad y benchmark. <a href="/dashboard">/dashboard</a> muestra rankings y la comparación local contra domicilio.</p>
+  <p><a href="/logs">/logs</a> muestra <strong>cada petición en vivo</strong>: qué llegó, qué respondió la app y por qué. Cada respuesta trae un <code>X-Request-Id</code> para encontrarla. Los errores nunca salen «pelados»: siempre dicen la causa y qué hacer.</p>
+</section>
+
+<!-- ============================== PARTE 4 ============================== -->
+<div class="ml5__parte" id="parte-4"><span>Parte 4</span><h2>Requisitos del final</h2></div>
+
+<section class="panel ml5__seccion" id="criterios">
+  <p class="eyebrow">Requisitos</p>
+  <h2>Criterio por criterio</h2>
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Criterio</th><th>Peso</th><th>Dónde se cumple</th></tr></thead>
+      <tbody>
+        <tr><td>Base de datos</td><td>5 %</td><td>SQLite (restaurante) y MongoDB (pasarela), con relaciones e índices</td></tr>
+        <tr><td>Módulos operativos</td><td>15 %</td><td>Usuarios con roles, categorías, productos, pedidos, facturas, notas crédito y pagos</td></tr>
+        <tr><td>Algoritmos y análisis experimental</td><td>30 %</td><td>/laboratorio: conteo de operaciones hasta n = 25.000, optimizaciones O(n²) → O(n) y O(n log n), CSV</td></tr>
+        <tr><td>Limpieza y calidad</td><td>10 %</td><td>nucleo/limpieza.py, /api/calidad con puntaje y validación de la pasarela</td></tr>
+        <tr><td>Integridad</td><td>10 %</td><td>Cadena SHA-256 de facturas y pagos, huella de comprobantes y HMAC de transacciones</td></tr>
+        <tr><td>Modelos de IA</td><td>30 %</td><td>/ia (TensorFlow.js y Simple Statistics) y el kiosko con ml5.js</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================== PARTE 5 ============================== -->
+<div class="ml5__parte" id="parte-5"><span>Parte 5</span><h2>Bugs encontrados y cómo se solucionaron</h2></div>
+
+<section class="panel ml5__seccion" id="bugs-pasarela">
+  <p class="eyebrow">Bugs · pasarela y MongoDB</p>
+  <h2>Pasarela de pagos y MongoDB</h2>
+  <div class="tabla-scroll">
+    <table class="bugs">
+      <thead><tr><th>Bug</th><th>Por qué pasaba</th><th>Cómo se solucionó</th></tr></thead>
+      <tbody>
+        <tr><td>El bot del profesor recibía <strong>400</strong> en transacciones correctas</td><td>Cada cliente envía distinto: UTF-16 desde PowerShell, BOM, form-data de Postman, datos en la URL, fechas en número (Telegram)</td><td>Lector tolerante que entiende todos esos formatos; 35 casos de clientes externos probados</td></tr>
+        <tr><td>Casi todo respondía <strong>201</strong>, aunque se rechazara</td><td>Una opción convertía los rechazos en 201; el error solo se veía en el panel</td><td>Códigos reales: 201 válida, 202 sospechosa, 422 inválida, 409 duplicada, 400 cuerpo roto</td></tr>
+        <tr><td><strong>Error 500</strong> si MongoDB se caía</td><td>No se manejaba la desconexión</td><td>Responde 503 con <code>Retry-After</code>, no cuenta la transacción en la ventana y se reconecta sola cada 15 s</td></tr>
+        <tr><td><code>/api/health</code> decía «ok» con MongoDB caído</td><td>No consultaba la base de verdad</td><td>Hace un ping real a MongoDB</td></tr>
+        <tr><td>Las pruebas tardaban ~2 s por petición</td><td>En Windows, <code>localhost</code> intenta IPv6 primero</td><td>Usar <code>127.0.0.1</code> en los scripts y en Docker</td></tr>
+        <tr><td>Hash rechazado con datos correctos</td><td>El servidor firmaba con otra llave y exigía campos que no estaban en la diapositiva</td><td>Llave de la clase por defecto, firma del JSON tal como llega y diagnóstico de la causa en cada <code>HASH_MISMATCH</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel ml5__seccion" id="bugs-seguridad">
+  <p class="eyebrow">Bugs · seguridad</p>
+  <h2>Seguridad de la URL pública</h2>
+  <div class="tabla-scroll">
+    <table class="bugs">
+      <thead><tr><th>Bug</th><th>Riesgo</th><th>Cómo se solucionó</th></tr></thead>
+      <tbody>
+        <tr><td><code>/download/{archivo}</code> servía cualquier archivo del proyecto</td><td>Descargar código y la base de datos</td><td>Ruta eliminada</td></tr>
+        <tr><td><code>/logs</code> mostraba la clave de pago y los tokens</td><td>Pagar un pedido ajeno</td><td>Se reemplazan por <code>***</code> antes de guardar</td></tr>
+        <tr><td>La cédula se escapaba en <code>/logs</code> si venía como «Cédula», <code>c%C3%A9dula</code> o en Latin-1</td><td>Exponer datos personales</td><td>Se oculta sobre los datos ya leídos, a cualquier profundidad, sin importar mayúsculas ni tildes</td></tr>
+        <tr><td>Un JSON malicioso (<code>\ud800</code> o anidado miles de veces) rompía <code>/logs</code></td><td>Error 500 permanente o petición sin registrar</td><td>Se limpia el carácter, se captura el error de recursión y registrar nunca tumba la petición</td></tr>
+        <tr><td>Cualquiera podía cambiar o borrar el menú por la API</td><td>Precios en $1</td><td>403 <code>MENU_PROTEGIDO</code>, tope de 100 productos y límite de 180 escrituras por minuto por IP (429)</td></tr>
+        <tr><td>Renombrar una categoría saltaba la protección del menú</td><td>Mover productos protegidos</td><td>403 <code>CATEGORIA_PROTEGIDA</code>; correos de usuarios enmascarados</td></tr>
+        <tr><td>La IP registrada se podía falsificar</td><td>Esquivar el límite por IP</td><td>Uvicorn solo confía en <code>X-Forwarded-For</code> de la red de Docker</td></tr>
+        <tr><td>Muestras de manos en <code>/static</code>, descargables por ngrok</td><td>Datos biométricos públicos</td><td>Carpeta privada, solo con el token del equipo</td></tr>
+        <tr><td>Dependencias con fallos conocidos</td><td>Caídas del servidor</td><td>FastAPI, Starlette, Uvicorn y python-multipart actualizados a versiones fijas</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel ml5__seccion" id="bugs-datos">
+  <p class="eyebrow">Bugs · datos y cálculos</p>
+  <h2>Datos y cálculos</h2>
+  <div class="tabla-scroll">
+    <table class="bugs">
+      <thead><tr><th>Bug</th><th>Por qué pasaba</th><th>Cómo se solucionó</th></tr></thead>
+      <tbody>
+        <tr><td>Un precio «12.000» quedaba en <strong>12 pesos</strong></td><td>El punto se leía como decimal, no como separador de miles</td><td><code>parse_precio</code> entiende el formato colombiano ($12.000, 50.000,00)</td></tr>
+        <tr><td>Un número de 400 cifras se aceptaba como precio</td><td>No había tope al cambiar de validador</td><td>Se rechazan infinitos y vuelve el tope de 1.000 millones (<code>INVALID_VALUE</code>)</td></tr>
+        <tr><td>El laboratorio mostraba 24 sumas con n = 10</td><td>Contaba una suma por producto, no por pedido</td><td>«Suma de ventas»: exactamente n sumas; la recursión se muestra desglosada (19 = 10 + 9)</td></tr>
+        <tr><td>Doble clic o recargar creaba el pedido dos veces</td><td>El formulario se reenviaba</td><td>Cada formulario lleva un <code>pedido_token</code>: si se repite, devuelve el pedido ya hecho</td></tr>
+        <tr><td>Un pedido se podía pagar desde cualquier lado</td><td>No se verificaba quién pagaba</td><td>Clave propia del pedido (403 sin ella) y transacción VALID por el total exacto</td></tr>
+        <tr><td>Un valor dudoso podía terminar en 0</td><td>Conversión silenciosa</td><td>«abc», NaN, negativos o booleanos se rechazan con su código; nunca se vuelven 0</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel ml5__seccion" id="bugs-kiosko">
+  <p class="eyebrow">Bugs · kiosko y pantalla</p>
+  <h2>Kiosko de gestos y pantalla</h2>
+  <div class="tabla-scroll">
+    <table class="bugs">
+      <thead><tr><th>Bug</th><th>Por qué pasaba</th><th>Cómo se solucionó</th></tr></thead>
+      <tbody>
+        <tr><td>Reconocía manos en fotos y pantallas como reales</td><td>handPose busca formas de mano y se pedía una sola mano</td><td><code>elegirMano</code>: hasta 2 manos, confianza ≥ 85 %, tamaño mínimo y se usa la más cercana</td></tr>
+        <tr><td>Sin permiso de cámara la página quedaba en blanco</td><td>No se manejaban los errores del navegador</td><td>Mensaje claro por cada error (NotAllowed, NotFound, NotReadable…) y siempre se puede pedir tocando</td></tr>
+        <tr><td>Cada persona creía que debía entrenar la red</td><td>El modelo no estaba en el repositorio</td><td>El modelo entrenado (8 KB) viaja en el repo y en la imagen de Docker</td></tr>
+        <tr><td>Había que bajar la pantalla para pedir en el kiosko</td><td>Cámara, guía y menú estaban apilados</td><td>Kiosko en una sola pantalla: cámara y gestos a un lado, combos y pedido al otro</td></tr>
+        <tr><td>Los cambios de diseño no se veían</td><td>El navegador usaba la hoja de estilos vieja en caché</td><td>Versión en cada CSS (<code>?v=2</code>) para forzar la descarga</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================== PARTE 6 ============================== -->
+<div class="ml5__parte" id="parte-6"><span>Parte 6</span><h2>Calidad y despliegue</h2></div>
+
+<section class="panel ml5__seccion" id="seguridad">
+  <p class="eyebrow">Calidad</p>
+  <h2>Seguridad y privacidad</h2>
+  <ul>
+    <li><strong>Integridad:</strong> HMAC-SHA256 en transacciones y cadena SHA-256 en facturas y pagos; comparación con <code>compare_digest</code>.</li>
+    <li><strong>Tokens:</strong> el del equipo del local (cocina, descuentos, anular facturas, guardar modelos) y la clave de pago de cada pedido.</li>
+    <li><strong>Protecciones:</strong> menú y categorías protegidos, límite de peticiones por IP, datos sensibles ocultos en los logs.</li>
+    <li><strong>Privacidad:</strong> la cámara se procesa solo en el navegador; aviso en la primera visita y política en <a href="/privacidad">/privacidad</a> según la Ley 1581 de 2012 y el Decreto 1377 de 2013.</li>
+  </ul>
+  <p class="subtitle">El hash garantiza integridad, no identidad: la app no tiene inicio de sesión de usuarios.</p>
+</section>
+
+<section class="panel ml5__seccion" id="pruebas">
+  <p class="eyebrow">Calidad</p>
+  <h2>Pruebas</h2>
+  <div class="cifras">
+    <div><strong>211</strong><span>pruebas unitarias en Python</span></div>
+    <div><strong>58/58</strong><span>prueba del profesor por ngrok</span></div>
+    <div><strong>35/35</strong><span>clientes externos (Telegram, Postman, CORS)</span></div>
+    <div><strong>31/31</strong><span>de punta a punta contra MongoDB real</span></div>
+  </div>
+  <p>Cubren Dijkstra, heap, cola y pila, algoritmos, pedidos y pagos, facturación e integridad, limpieza, toda la pasarela antifraude, seguridad, el kiosko de gestos y las reglas de la mano en JavaScript.</p>
+</section>
+
+<section class="panel ml5__seccion" id="despliegue">
+  <p class="eyebrow">Despliegue</p>
+  <h2>Docker y ngrok</h2>
+  <div class="dos-columnas">
+    <div class="tarjeta">
+      <h3>Docker Compose</h3>
+      <p>App + MongoDB 7 en contenedores, usuario sin privilegios y chequeo de salud. Los datos viven en volúmenes: sobreviven a reinicios. <code>docker compose up -d --build</code></p>
+    </div>
+    <div class="tarjeta">
+      <h3>ngrok</h3>
+      <p>Publica la app con una URL fija para que el profesor y su bot la prueben desde afuera. Todo lo que llega se ve en <a href="/logs">/logs</a> con origen e IP.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== PARTE 7 ============================== -->
+<div class="ml5__parte" id="parte-7"><span>Parte 7</span><h2>Cierre</h2></div>
+
+<section class="panel ml5__seccion" id="demo">
+  <p class="eyebrow">Cierre</p>
+  <h2>Guion de demostración</h2>
+  <ol>
+    <li><a href="/">Pedir</a> un domicilio y mostrar la ruta de Dijkstra en el mapa.</li>
+    <li>Pedir en el <a href="/gestos">kiosko con gestos</a>: 1 dedo, combo 2, pulgar arriba.</li>
+    <li>En <a href="/cocina">cocina</a>, ver la cola, el heap de domicilios y deshacer; ver <a href="/turnos">turnos</a>.</li>
+    <li>Pagar el pedido en la <a href="/transacciones">pasarela</a> y ver la <a href="/facturas">factura</a> pagada.</li>
+    <li>Enviar 3 transacciones en 10 s y ver la anomalía en el <a href="/antifraude">dashboard antifraude</a>.</li>
+    <li>Alterar una factura y mostrar cómo la <a href="/api/integridad">integridad</a> detecta el cambio.</li>
+    <li>Correr el <a href="/laboratorio">laboratorio</a> con 1.000 y 25.000 pedidos.</li>
+    <li>Entrenar y evaluar el clasificador de fraude en <a href="/ia">/ia</a>.</li>
+    <li>Cerrar en <a href="/logs">/logs</a> mostrando cada petición que hicimos.</li>
+  </ol>
+</section>
+
+<section class="panel ml5__seccion" id="limites">
+  <p class="eyebrow">Cierre</p>
+  <h2>Limitaciones y trabajo futuro</h2>
+  <ul class="limites">
+    <li><strong>Sin inicio de sesión:</strong> los roles existen, pero no hay login; las acciones del equipo se protegen con un token por equipo.</li>
+    <li><strong>Un solo proceso:</strong> la ventana deslizante vive en memoria; para varias instancias habría que llevarla a Redis o MongoDB.</li>
+    <li><strong>Pagos simulados:</strong> la pasarela no cobra dinero real ni guarda el número de pedido.</li>
+    <li><strong>ngrok gratis:</strong> muestra un aviso en el navegador y corta conexiones si llegan demasiadas seguidas.</li>
+    <li><strong>Kiosko:</strong> necesita internet la primera vez, buena luz y solo reconoce gestos quietos de una mano.</li>
+  </ul>
+</section>
+
+<section class="panel ml5__seccion" id="conclusiones">
+  <p class="eyebrow">Cierre</p>
+  <h2>Conclusiones</h2>
+  <ul>
+    <li>Llevamos los algoritmos de clase a un <strong>negocio real</strong>: grafos, heap, colas, pilas y Big O resuelven problemas del restaurante.</li>
+    <li>La pasarela combina <strong>validación, integridad y detección de fraude</strong> y explica cada rechazo.</li>
+    <li>La <strong>IA</strong> corre en el navegador: clasificación de fraude, pronóstico y gestos sin servidores con GPU.</li>
+    <li>Buscar y corregir bugs reales, sobre todo de seguridad, fue tan importante como construir funciones nuevas.</li>
+    <li>El kiosko con gestos hace la app <strong>más inclusiva</strong>, cuidando la privacidad.</li>
+  </ul>
+</section>
+
+</div>
+</div>
+{% endblock %}

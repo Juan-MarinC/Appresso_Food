@@ -139,6 +139,12 @@ async def ml5_page(request: Request):
     })
 
 
+@router.get("/proyecto")
+async def project_page(request: Request):
+    """Presentación del proyecto final: qué hace la web, cómo y para qué, bugs encontrados y cómo se resolvieron."""
+    return templates.TemplateResponse("proyecto.html", {"request": request})
+
+
 # --- Pantalla de turnos: lo que se prepara y lo que ya se puede recoger en el mostrador ---
 LISTOS_EN_PANTALLA = 6
 
@@ -162,6 +168,11 @@ async def turns():
     }
 
 
+# ======================================================================
+# [EXPOSICIÓN] VALIDACIÓN DEL PAGO DE UN PEDIDO
+# Exige la pay_key del pedido (solo está en su página de confirmación) y una
+# transacción VALID por el total exacto.
+# ======================================================================
 @router.post("/api/pedidos/{order_id}/pago")
 def pay_order(order_id: int, idTxn: str = Body(..., min_length=1, max_length=64), clave: str = Body("", max_length=64)):
     """Une el pedido con su transacción de la pasarela: solo con la clave de la confirmación, y si la transacción
@@ -267,6 +278,10 @@ async def create_order(
     served_by: str = Form(""),
 ):
     form = await request.form()
+    # ======================================================================
+    # [EXPOSICIÓN] TOKEN DEL FORMULARIO
+    # Evita crear el pedido dos veces por doble clic o recarga.
+    # ======================================================================
     token = str(form.get("pedido_token") or "")[:64]
     if token in _pedidos_por_token:
         return _confirmacion(request, _pedidos_por_token[token])
@@ -365,6 +380,10 @@ async def kitchen(request: Request):
     )
 
 
+# ======================================================================
+# [EXPOSICIÓN] VALIDACIÓN DE SESIÓN PARA COCINA
+# Solo el equipo del local (con su token) puede avanzar o despachar pedidos.
+# ======================================================================
 def _exigir_equipo(request: Request, token: str) -> None:
     """Cocina cambia pedidos: solo con el token que la página entrega a quien la abre en el equipo del local
     (o con APPRESSO_ENTRENAMIENTO=1). Así tampoco sirve un formulario armado desde otro sitio."""
