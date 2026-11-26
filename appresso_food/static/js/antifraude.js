@@ -133,15 +133,25 @@
     }
 
     // ---------- ventana deslizante en vivo ----------
+    const MAX_VENTANAS = 50;  // con miles de usuarios, dibujarlos todos cada 1,5 s llenaba la página y la volvía lenta
+
     async function loadWindow() {
         const res = await api("/api/window");
-        if (!res.ok) { $("window").innerHTML = failed(res); return; }
-        const users = res.data.usuarios;
-        if (!users.length) { $("window").innerHTML = empty("No hay transacciones activas en ninguna ventana. Envíe transacciones desde /transacciones."); return; }
-        $("window").innerHTML = users.map((u) => {
+        if (!res.ok) { $("window-resumen").textContent = "Ventana no disponible"; $("window").innerHTML = failed(res); return; }
+        const users = [...res.data.usuarios].sort((a, b) => b.cantidad - a.cantidad);  // primero los que están en alerta
+        const enAlerta = users.filter((u) => u.cantidad >= res.data.limite).length;
+        $("window-resumen").innerHTML = users.length
+            ? `<strong>${users.length.toLocaleString("es-CO")}</strong> usuario(s) con transacciones en la ventana · <strong>${enAlerta.toLocaleString("es-CO")}</strong> en alerta (${res.data.limite} o más en ${res.data.ventana_segundos} s) <span class="muted">· ver detalle</span>`
+            : "No hay transacciones activas en ninguna ventana.";
+        if (!$("window-box").open) return;  // plegado: no hace falta dibujar los gráficos
+        if (!users.length) { $("window").innerHTML = empty("Envíe transacciones desde /transacciones."); return; }
+        const extra = users.length > MAX_VENTANAS ? `<p class="muted">Se muestran los ${MAX_VENTANAS} con más transacciones en la ventana de ${users.length.toLocaleString("es-CO")}.</p>` : "";
+        $("window").innerHTML = extra + users.slice(0, MAX_VENTANAS).map((u) => {
             const hot = u.cantidad >= res.data.limite;
-            return `<div class="wuser"><div class="head"><strong>${esc(u.usuario)}</strong>
-                <span>${hot ? chip("st", "SUSPICIOUS") : chip("st", "VALID")} ${u.cantidad} de ${res.data.limite} permitidas · ventana ${res.data.ventana_segundos} s hasta ${time(u.ancla)}</span></div>
+            const faltan = res.data.limite - u.cantidad;
+            const estado = hot ? `posible fraude: superó el límite de ${res.data.limite}` : faltan === 1 ? "una más y se marca como posible fraude" : "dentro de lo normal";
+            return `<div class="wuser ${hot ? "wuser--hot" : ""}"><div class="head"><strong>${esc(u.usuario)}</strong>${hot ? chip("st", "SUSPICIOUS") : chip("st", "VALID")}</div>
+                <p class="wuser__resumen"><b>${u.cantidad}</b> ${u.cantidad === 1 ? "transacción" : "transacciones"} en los últimos ${res.data.ventana_segundos} s · ${estado} <span class="muted">(última a las ${time(u.ancla)})</span></p>
                 ${windowSvg(u.entradas, res.data.ventana_segundos, res.data.limite, u.ancla)}</div>`;
         }).join("");
     }
@@ -269,6 +279,7 @@
 
     const slow = () => { loadStats(); loadAnomalies(); loadTxns(); loadInvalids(); loadLogs(); loadWindowEvents(); };
     slow(); loadWindow();
+    $("window-box").addEventListener("toggle", loadWindow);  // al abrir el desplegable se dibuja enseguida
     setInterval(loadWindow, 1500);
     setInterval(slow, 5000);
 })();
