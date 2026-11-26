@@ -27,6 +27,11 @@ MUESTRAS = BASE_DIR / "datos_privados" / "muestras_gestos.json"
 LOCALES = {"127.0.0.1", "::1", "localhost"}
 CABECERAS_PROXY = ("x-forwarded-for", "forwarded", "x-real-ip", "x-forwarded-host", "x-forwarded-proto", "via",
                    "cf-connecting-ip", "true-client-ip")
+# ======================================================================
+# [EXPOSICIÓN] TOKEN DE SESIÓN DEL EQUIPO DEL LOCAL
+# Nuevo en cada arranque del servidor. Solo se entrega a quien abre la página
+# en el mismo equipo (no por ngrok). Protege /entrenar y los botones de Cocina.
+# ======================================================================
 TOKEN = secrets.token_urlsafe(24)  # nuevo en cada arranque del servidor
 MAX_BYTES = 5_000_000
 # Los nombres que ml5 usa al cargar: model.json apunta a model.weights.bin y lee model_meta.json.
@@ -53,6 +58,10 @@ def token_para(request: Request) -> Optional[str]:
     return TOKEN if permitido and _mismo_sitio(request) else None
 
 
+# ======================================================================
+# [EXPOSICIÓN] VALIDACIÓN DEL TOKEN DE SESIÓN
+# token_valido compara el token recibido con compare_digest.
+# ======================================================================
 def token_valido(request: Request, recibido: str) -> bool:
     """¿El token recibido es el del equipo del local? Lo usan /entrenar, cocina, los descuentos y anular facturas."""
     esperado = token_para(request)

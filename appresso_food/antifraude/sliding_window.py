@@ -75,6 +75,11 @@ class SlidingWindowManager:
     def window_seconds(self) -> float:
         return self.window.total_seconds()
 
+    # ======================================================================
+    # [EXPOSICIÓN] VALIDACIÓN DE LA SESIÓN (ventana deslizante por usuario)
+    # 1. entra la transacción  2. salen las de más de N segundos  3. se cuentan.
+    # Con count >= 3 en 10 s, fraud_service marca la transacción como SUSPICIOUS.
+    # ======================================================================
     def add(self, user: str, ts: datetime, txn_id: str, valor: float) -> AddResult:
         with self._lock:
             entries = self._windows.setdefault(user, [])

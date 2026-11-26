@@ -51,6 +51,11 @@ def canonical_fields(id_txn: str, nombre: Optional[str], cedula: Optional[str], 
     return fields
 
 
+# ======================================================================
+# [EXPOSICIÓN] CÁLCULO DEL HASH (HMAC-SHA256), igual al código de la clase
+# datos = json.dumps(transaccion, sort_keys=True, separators=(',', ':'))
+# hash  = hmac.new(LLAVE, datos.encode('utf-8'), hashlib.sha256).hexdigest()
+# ======================================================================
 def canonical_json(fields: Any) -> str:
     return json.dumps(fields, sort_keys=True, separators=(",", ":"))
 
@@ -63,6 +68,10 @@ def hmac_text(text: str, secret: str) -> str:
     return hmac.new(secret.encode("utf-8"), text.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
+# ======================================================================
+# [EXPOSICIÓN] COMPARACIÓN SEGURA DEL HASH
+# compare_digest tarda lo mismo acierte o falle: no da pistas por el tiempo.
+# ======================================================================
 def hashes_match(expected: str, received: str) -> bool:
     return hmac.compare_digest(expected.lower(), received.lower())
 

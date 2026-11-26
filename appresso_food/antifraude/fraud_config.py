@@ -46,6 +46,11 @@ DEFAULT_PAYMENT_METHODS = ["Tarjeta", "Efectivo", "Nequi", "Daviplata", "PSE", "
 
 @dataclass
 class FraudConfig:
+    # ======================================================================
+    # [EXPOSICIÓN] PARÁMETROS DE LA VALIDACIÓN
+    # window_seconds y max_transactions: tamaño de la ventana de sesión y límite.
+    # hmac_secret: llave del hash (variable de entorno APPRESSO_HMAC_SECRET).
+    # ======================================================================
     window_seconds: float = 10.0
     max_transactions: int = 3
     hmac_secret: str = DEFAULT_SECRET

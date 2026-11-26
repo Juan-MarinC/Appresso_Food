@@ -149,6 +149,12 @@ def parse_date(value: Any, lenient: bool = False) -> Tuple[Optional[datetime], O
     return parsed.replace(microsecond=(parsed.microsecond // 1000) * 1000), None
 
 
+# ======================================================================
+# [EXPOSICIÓN] VALIDACIÓN DE LOS DATOS
+# Revisa idTxn, user (correo), date, value, paymentMethod, nombre, cedula y el
+# formato del hash. Un valor dudoso nunca se convierte en 0: se rechaza con un código
+# (INVALID_EMAIL, INVALID_VALUE, INVALID_DATE...). Devuelve TODOS los errores juntos.
+# ======================================================================
 def validate_transaction(raw: Any, config: FraudConfig) -> Tuple[Optional[NormalizedTransaction], List[FieldError]]:
     """Devuelve (transacción normalizada, []) o (None, errores). Reúne TODOS los errores, no solo el primero."""
     errors: List[FieldError] = []

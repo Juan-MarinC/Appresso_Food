@@ -321,13 +321,28 @@ class FraudService:
             outcome.body["id_invalida"] = self._quarantine(raw, raw_text, errors, meta or {}, tipo)
         return outcome
 
+    # ======================================================================
+    # [EXPOSICIÓN] FLUJO COMPLETO DE VALIDACIÓN
+    # Paso 1: validar los datos (validate_transaction en fraud_validation.py).
+    # Paso 2: validar el hash HMAC-SHA256 que envía el cliente (_check_client_hash).
+    # Paso 3: rechazar duplicados y revisar la ventana deslizante del usuario.
+    # ======================================================================
     def _process(self, raw: Any, raw_text: str) -> Outcome:
         now = self.clock()
 
+        # ======================================================================
+        # [EXPOSICIÓN] PASO 1 · VALIDACIÓN DE LOS DATOS
+        # Si algún campo es inválido, se rechaza con TODOS los errores y va a cuarentena.
+        # ======================================================================
         norm, errors = validation.validate_transaction(raw, self.config)
         if errors:
             return self._reject(raw, raw_text, errors, now)
 
+        # ======================================================================
+        # [EXPOSICIÓN] PASO 2 · VALIDACIÓN DEL HASH
+        # expected = HMAC que el servidor guarda. _check_client_hash compara el hash del
+        # cliente con el HMAC del JSON recibido; si no coincide -> HASH_MISMATCH (422).
+        # ======================================================================
         # El hash que se guarda es el de los datos normalizados: con él se re-verifica la integridad después.
         expected = hashing.compute_hash(self._canonical(norm), self.config.hmac_secret)
         hash_check = self._check_client_hash(raw, norm)
@@ -341,10 +356,19 @@ class FraudService:
         hash_origin = "CLIENTE_VERIFICADO" if norm.hash_cliente else "SERVIDOR"
 
         with self._lock:
+            # ======================================================================
+            # [EXPOSICIÓN] PASO 3a · DUPLICADOS
+            # Un idTxn ya aceptado no se vuelve a registrar: DUPLICATE_TRANSACTION.
+            # ======================================================================
             if self.repo.find_accepted_by_id_txn(norm.id_txn):
                 return self._duplicate(raw, raw_text, norm, expected, now)
 
             user_id = self.repo.upsert_user(norm.email, norm.nombre, norm.cedula, now)
+            # ======================================================================
+            # [EXPOSICIÓN] PASO 3b · VALIDACIÓN DE LA SESIÓN (ventana deslizante)
+            # La transacción entra a la ventana del usuario y salen las de más de 10 s.
+            # Ver SlidingWindowManager.add en sliding_window.py.
+            # ======================================================================
             result = self.window.add(norm.email, norm.fecha, norm.id_txn, norm.valor)  # entra + salen
             try:
                 members, count = result.members, result.count
@@ -362,6 +386,10 @@ class FraudService:
                 in_window = members
 
                 anomalies: List[dict] = []
+                # ======================================================================
+                # [EXPOSICIÓN] PASO 3c · ANOMALÍA DE SESIÓN
+                # 3 o más transacciones del mismo usuario en 10 s -> SUSPICIOUS (POSSIBLE_FRAUD).
+                # ======================================================================
                 if count >= self.config.max_transactions:
                     anomalies.append(
                         self._anomaly_doc(
@@ -456,6 +484,11 @@ class FraudService:
         return Outcome(202 if estado == STATUS_SUSPICIOUS else 201, body)
 
     # ------------------------------------------------------------------ helpers
+    # ======================================================================
+    # [EXPOSICIÓN] VALIDACIÓN DEL HASH DEL CLIENTE
+    # Quita el campo 'hash' del JSON, recalcula el HMAC-SHA256 con la llave
+    # compartida y lo compara con el recibido. Sin hash, el servidor calcula uno.
+    # ======================================================================
     def _check_client_hash(self, raw: dict, norm: NormalizedTransaction) -> dict:
         """Compara el hash del cliente con el HMAC del JSON recibido (sin `hash`), como en la clase,
         o con el de los datos normalizados (el que calcula el formulario)."""
@@ -668,6 +701,11 @@ class FraudService:
         fields = self._canonical(norm)
         return Outcome(200, {"ok": True, "hash": hashing.compute_hash(fields, self.config.hmac_secret), "canonico": hashing.canonical_json(fields)})
 
+    # ======================================================================
+    # [EXPOSICIÓN] VERIFICACIÓN POSTERIOR DEL HASH
+    # GET /api/transactions/{idTxn}/verify: recalcula el hash con los datos
+    # guardados en MongoDB. Si alguien los modificó -> INCONSISTENCIA.
+    # ======================================================================
     def verify(self, id_txn: str) -> Optional[dict]:
         """Valida posteriormente el hash guardado recalculándolo con los datos guardados."""
         doc = self.repo.get_transaction(id_txn)

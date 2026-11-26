@@ -158,6 +158,12 @@ def _http_status(service: FraudService, outcome, body: bytes = b"") -> int:
 
 
 # Rutas alternativas (con y sin "/" final: un POST redirigido pierde el cuerpo en muchos clientes).
+# ======================================================================
+# [EXPOSICIÓN] PUNTO DE ENTRADA de las transacciones
+# Toda transacción llega aquí (POST /api/transactions). El cuerpo pasa a
+# FraudService.process_body -> _process (fraud_service.py), que valida en orden:
+# 1) los datos  2) el hash  3) la ventana deslizante del usuario (sesión).
+# ======================================================================
 @router.post("/api/transactions")
 @router.post("/api/transactions/", include_in_schema=False)
 @router.post("/api/transacciones", include_in_schema=False)
